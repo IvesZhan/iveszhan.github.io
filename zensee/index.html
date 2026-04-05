@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZenSee 通用链接</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f0e7;
+      --surface: rgba(255, 251, 246, 0.88);
+      --line: rgba(72, 53, 38, 0.12);
+      --text: #2b231c;
+      --muted: #6d6257;
+      --accent: #7a6552;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.86), transparent 30%),
+        radial-gradient(circle at top right, rgba(233, 214, 196, 0.48), transparent 28%),
+        linear-gradient(180deg, #f7f0e7 0%, #f4ede4 50%, #efe7dd 100%);
+      color: var(--text);
+      font: 16px/1.7 "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+
+    main {
+      width: min(560px, 100%);
+      padding: 28px 24px;
+      border-radius: 28px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      box-shadow: 0 22px 40px rgba(72, 53, 38, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font: 700 28px/1.25 "Noto Serif SC", "Songti SC", serif;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #8e7864 0%, #75604e 100%);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    a.secondary {
+      background: rgba(255, 252, 248, 0.72);
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+
+    code {
+      display: block;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255, 252, 248, 0.68);
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="title">ZenSee 通用链接</h1>
+    <p id="summary">如果设备已安装 ZenSee，点击这条通用链接时应直接打开 App。</p>
+    <p id="hint">如果当前仍停留在浏览器，可以继续前往官网或群组邀请页。</p>
+    <code id="link-preview"></code>
+    <div class="actions">
+      <a id="primary-link" href="https://iveszhan.github.io/zensee-web/">前往 ZenSee 官网</a>
+      <a class="secondary" href="https://apps.apple.com/app/6760809128">下载 iOS 版</a>
+      <a class="secondary" href="https://raw.githubusercontent.com/IvesZhan/zensee-android/main/downloads/latest/ZenSee-android-latest.apk">下载 Android 版</a>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const groupId = params.get("id");
+    const target = (params.get("target") || "").toLowerCase();
+    const isGroupJoin = Boolean(groupId) && (!target || target === "group-join" || target === "join");
+    const currentURL = window.location.href;
+    const linkPreview = document.getElementById("link-preview");
+    const title = document.getElementById("title");
+    const summary = document.getElementById("summary");
+    const hint = document.getElementById("hint");
+    const primaryLink = document.getElementById("primary-link");
+
+    linkPreview.textContent = currentURL;
+
+    if (isGroupJoin) {
+      title.textContent = "ZenSee 群组邀请链接";
+      summary.textContent = "如果设备已安装 ZenSee，点击这条链接时应直接打开 App 并进入群组加入流程。";
+      hint.textContent = "如果没有拉起 App，可以先打开网页版邀请页，再检查通用链接配置。";
+      primaryLink.href = `https://iveszhan.github.io/zensee-web/group/?id=${encodeURIComponent(groupId)}`;
+      primaryLink.textContent = "打开网页版群组邀请页";
+    }
+  </script>
+</body>
+</html>

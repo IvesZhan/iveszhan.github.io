@@ -5,6 +5,9 @@
       {
         "appID": "L7U6Z557S6.com.yuzhan.zenseeapp",
         "paths": [
+          "/zensee",
+          "/zensee/",
+          "/zensee/*",
           "/zensee-web/group/*",
           "/wechat-sdk/*"
         ]
