@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.yuzhan.zenseeapp",
+      "sha256_cert_fingerprints": [
+        "8D:5E:FD:DC:1D:6D:2C:DE:1D:DF:C7:E1:32:BA:5B:3C:BE:31:0F:63:D0:62:3F:0D:C5:92:74:C4:AF:A5:5D:11"
+      ]
+    }
+  }
+]
