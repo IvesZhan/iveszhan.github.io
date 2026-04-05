@@ -52,6 +52,31 @@
       color: var(--muted);
     }
 
+    .guide {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 252, 248, 0.72);
+      border: 1px solid var(--line);
+    }
+
+    .guide strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .guide ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .guide li + li {
+      margin-top: 6px;
+    }
+
     .actions {
       display: grid;
       gap: 12px;
@@ -94,7 +119,15 @@
   <main>
     <h1 id="title">ZenSee 通用链接</h1>
     <p id="summary">如果设备已安装 ZenSee，点击这条通用链接时应直接打开 App。</p>
-    <p id="hint">如果当前仍停留在浏览器，可以继续前往官网或群组邀请页。</p>
+    <p id="hint">如果当前仍停留在第三方浏览器，请尝试用系统默认浏览器重新打开这条链接。</p>
+    <div class="guide" id="guide">
+      <strong id="guide-title">如果没有自动拉起 App</strong>
+      <ol id="guide-steps">
+        <li>点击右上角菜单，选择“在默认浏览器中打开”或类似选项。</li>
+        <li>系统默认浏览器会再次尝试拉起 ZenSee。</li>
+        <li>如果设备尚未安装 ZenSee，可以先使用下方按钮下载。</li>
+      </ol>
+    </div>
     <code id="link-preview"></code>
     <div class="actions">
       <a id="primary-link" href="https://iveszhan.github.io/zensee-web/">前往 ZenSee 官网</a>
@@ -112,16 +145,23 @@
     const title = document.getElementById("title");
     const summary = document.getElementById("summary");
     const hint = document.getElementById("hint");
+    const guideTitle = document.getElementById("guide-title");
+    const guideSteps = document.getElementById("guide-steps");
     const primaryLink = document.getElementById("primary-link");
 
     linkPreview.textContent = currentURL;
 
     if (isGroupJoin) {
       title.textContent = "ZenSee 群组邀请链接";
-      summary.textContent = "如果设备已安装 ZenSee，点击这条链接时应直接打开 App 并进入群组加入流程。";
-      hint.textContent = "如果没有拉起 App，可以先打开网页版邀请页，再检查通用链接配置。";
-      primaryLink.href = `https://iveszhan.github.io/zensee-web/group/?id=${encodeURIComponent(groupId)}`;
-      primaryLink.textContent = "打开网页版群组邀请页";
+      summary.textContent = "如果设备已安装 ZenSee，请点击右上角菜单，使用系统默认浏览器重新打开这条链接，再进入群组加入流程。";
+      hint.textContent = "第三方浏览器可能不会直接拉起 App。请优先切换到系统默认浏览器后再重试。";
+      guideTitle.textContent = "群组邀请链接打开方式";
+      guideSteps.innerHTML = [
+        "<li>点击右上角菜单，选择“在默认浏览器中打开”或类似选项。</li>",
+        "<li>系统默认浏览器会再次尝试拉起 ZenSee，并跳到该群组的加入流程。</li>",
+        "<li>如果还没有安装 ZenSee，可先用下方按钮下载，安装后再回到这条邀请链接。</li>"
+      ].join("");
+      primaryLink.hidden = true;
     }
   </script>
 </body>
