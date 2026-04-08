@@ -141,6 +141,7 @@
     const target = (params.get("target") || "").toLowerCase();
     const isGroupJoin = Boolean(groupId) && (!target || target === "group-join" || target === "join");
     const currentURL = window.location.href;
+    const androidDownloadURL = "https://iveszhan.github.io/zensee-web/download/";
     const linkPreview = document.getElementById("link-preview");
     const title = document.getElementById("title");
     const summary = document.getElementById("summary");
@@ -149,19 +150,73 @@
     const guideSteps = document.getElementById("guide-steps");
     const primaryLink = document.getElementById("primary-link");
 
+    function isAndroidDevice() {
+      return /android/i.test(navigator.userAgent || "");
+    }
+
+    function groupUniversalLink(value) {
+      return "https://iveszhan.github.io/zensee/?target=group-join&id=" + encodeURIComponent(value);
+    }
+
+    function groupCustomSchemeLink(value) {
+      return "zensee://group/join?id=" + encodeURIComponent(value);
+    }
+
+    function groupIntentLink(value) {
+      return "intent://group/join?id=" + encodeURIComponent(value) +
+        "#Intent;scheme=zensee;package=com.yuzhan.zenseeapp;S.browser_fallback_url=" +
+        encodeURIComponent(androidDownloadURL) + ";end";
+    }
+
+    function attemptAndroidAppOpen(value) {
+      try {
+        const sessionKey = "zensee-android-open-attempt:" + value;
+        if (window.sessionStorage && window.sessionStorage.getItem(sessionKey) === "1") {
+          return;
+        }
+        if (window.sessionStorage) {
+          window.sessionStorage.setItem(sessionKey, "1");
+        }
+      } catch (error) {
+        console.warn("[zensee] failed to persist android open attempt", error);
+      }
+
+      window.setTimeout(function () {
+        if (!document.hidden) {
+          window.location.href = groupCustomSchemeLink(value);
+        }
+      }, 140);
+    }
+
     linkPreview.textContent = currentURL;
 
     if (isGroupJoin) {
       title.textContent = "ZenSee 群组邀请链接";
-      summary.textContent = "如果设备已安装 ZenSee，请点击右上角菜单，使用系统默认浏览器重新打开这条链接，再进入群组加入流程。";
-      hint.textContent = "第三方浏览器可能不会直接拉起 App。请优先切换到系统默认浏览器后再重试。";
+      summary.textContent = isAndroidDevice()
+        ? "如果设备已安装 ZenSee，当前页面会优先尝试直接打开 App 并进入群组加入流程。"
+        : "如果设备已安装 ZenSee，点击这条链接时应直接打开 App。";
+      hint.textContent = isAndroidDevice()
+        ? "部分 Android 浏览器不会在已打开网页中再次触发 App Link。若没有自动跳转，请点击下方按钮直接打开 ZenSee。"
+        : "如果当前仍停留在第三方浏览器，请尝试用系统默认浏览器重新打开这条链接。";
       guideTitle.textContent = "群组邀请链接打开方式";
-      guideSteps.innerHTML = [
-        "<li>点击右上角菜单，选择“在默认浏览器中打开”或类似选项。</li>",
-        "<li>系统默认浏览器会再次尝试拉起 ZenSee，并跳到该群组的加入流程。</li>",
-        "<li>如果还没有安装 ZenSee，可先用下方按钮下载，安装后再回到这条邀请链接。</li>"
-      ].join("");
-      primaryLink.hidden = true;
+      guideSteps.innerHTML = isAndroidDevice()
+        ? [
+            "<li>页面会先尝试直接打开 ZenSee。</li>",
+            "<li>如果没有成功拉起 App，请点击下方“打开 ZenSee App”按钮。</li>",
+            "<li>如果设备尚未安装 ZenSee，可先使用下载按钮安装后再回来重试。</li>"
+          ].join("")
+        : [
+            "<li>点击右上角菜单，选择“在默认浏览器中打开”或类似选项。</li>",
+            "<li>系统默认浏览器会再次尝试拉起 ZenSee，并跳到该群组的加入流程。</li>",
+            "<li>如果还没有安装 ZenSee，可先用下方按钮下载，安装后再回到这条邀请链接。</li>"
+          ].join("");
+      primaryLink.hidden = false;
+      primaryLink.textContent = isAndroidDevice() ? "打开 ZenSee App" : "重新打开群组邀请";
+      primaryLink.href = isAndroidDevice() ? groupIntentLink(groupId) : groupUniversalLink(groupId);
+
+      if (isAndroidDevice()) {
+        attemptAndroidAppOpen(groupId);
+      }
     }
   </script>
 </body>
