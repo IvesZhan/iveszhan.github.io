@@ -132,7 +132,7 @@
     <div class="actions">
       <a id="primary-link" href="https://iveszhan.github.io/zensee-web/">前往 ZenSee 官网</a>
       <a class="secondary" href="https://apps.apple.com/app/6760809128">下载 iOS 版</a>
-      <a class="secondary" href="https://raw.githubusercontent.com/IvesZhan/zensee-android/main/downloads/latest/ZenSee-android-latest.apk">下载 Android 版</a>
+      <a class="secondary" id="android-download-link" href="https://www.pgyer.com/zensee-android">下载 Android 版</a>
     </div>
   </main>
   <script>
@@ -149,9 +149,31 @@
     const guideTitle = document.getElementById("guide-title");
     const guideSteps = document.getElementById("guide-steps");
     const primaryLink = document.getElementById("primary-link");
+    const androidDownloadLink = document.getElementById("android-download-link");
+    const pgyerAndroidDownloadURL = "https://www.pgyer.com/zensee-android";
+    const githubAndroidDownloadURL = "https://raw.githubusercontent.com/IvesZhan/zensee-android/main/downloads/latest/ZenSee-android-latest.apk";
 
     function isAndroidDevice() {
       return /android/i.test(navigator.userAgent || "");
+    }
+
+    function isSimplifiedChineseLocale(value) {
+      const lang = String(value || "").toLowerCase();
+      if (
+        lang.indexOf("zh-tw") === 0 ||
+        lang.indexOf("zh-hk") === 0 ||
+        lang.indexOf("zh-mo") === 0 ||
+        lang.indexOf("zh-hant") === 0
+      ) {
+        return false;
+      }
+      return lang.indexOf("zh") === 0;
+    }
+
+    function resolvedAndroidDownloadLink() {
+      return isSimplifiedChineseLocale(navigator.language || document.documentElement.lang)
+        ? pgyerAndroidDownloadURL
+        : githubAndroidDownloadURL;
     }
 
     function groupUniversalLink(value) {
@@ -189,6 +211,7 @@
     }
 
     linkPreview.textContent = currentURL;
+    androidDownloadLink.href = resolvedAndroidDownloadLink();
 
     if (isGroupJoin) {
       title.textContent = "ZenSee 群组邀请链接";
