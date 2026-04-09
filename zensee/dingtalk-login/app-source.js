@@ -1,7 +1,8 @@
-import { openLink } from "dingtalk-jsapi";
+import dd, { openLink } from "dingtalk-jsapi";
 import { openAuth } from "dingtalk-design-libs/biz/openAuth";
 
 const DEFAULT_RETURN_URL = "https://iveszhan.github.io/zensee/dingtalk-auth/";
+const DEFAULT_APP_RETURN_URL = "zensee://auth/dingtalk-login";
 const DEFAULT_CLIENT_ID = "dinggfbar3acbwmhawve";
 const DEFAULT_CORP_ID = "dingb30bc4a6f95b2caf";
 const DEFAULT_SCOPE = "Contact.User.Read";
@@ -19,6 +20,7 @@ const clientId = params.get("client_id") || DEFAULT_CLIENT_ID;
 const corpId = params.get("corp_id") || DEFAULT_CORP_ID;
 const state = params.get("state") || "";
 const returnTo = params.get("return_to") || DEFAULT_RETURN_URL;
+const appReturnTo = params.get("app_return_to") || DEFAULT_APP_RETURN_URL;
 const autoStart = params.get("auto") !== "0";
 
 let isSubmitting = false;
@@ -53,39 +55,84 @@ function baseDetailLines() {
     `scope: ${DEFAULT_SCOPE}`,
     `state: ${state || "(empty)"}`,
     `returnTo: ${returnTo}`,
+    `appReturnTo: ${appReturnTo}`,
     `env: ${/DingTalk/i.test(navigator.userAgent || "") ? "DingTalk" : "Browser"}`,
-    `openLink: ${typeof openLink === "function" ? "available" : "missing"}`
+    `openLink: ${typeof openLink === "function" ? "available" : "missing"}`,
+    `launchApp: ${typeof dd?.device?.launcher?.launchApp === "function" ? "available" : "missing"}`
   ];
 }
 
-async function openCallbackURL(callbackURL) {
+function buildAppReturnURL(queryParams) {
+  const [base, existingQuery = ""] = appReturnTo.split("?");
+  const merged = new URLSearchParams(existingQuery);
+  Object.entries(queryParams).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+    merged.set(key, value);
+  });
+
+  const query = merged.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+async function openCallbackURL(callbackURL, fallbackURL = returnTo) {
   returnLink.href = callbackURL;
   showDetails([
     ...baseDetailLines(),
-    `callbackURL: ${callbackURL}`
+    `callbackURL: ${callbackURL}`,
+    `fallbackURL: ${fallbackURL}`
   ]);
 
   const isDingTalk = /DingTalk/i.test(navigator.userAgent || "");
+  if (isDingTalk && typeof dd?.device?.launcher?.launchApp === "function") {
+    try {
+      const launchResult = await dd.device.launcher.launchApp({
+        app: callbackURL
+      });
+      if (launchResult?.result === true) {
+        return;
+      }
+
+      showDetails([
+        ...baseDetailLines(),
+        `callbackURL: ${callbackURL}`,
+        `fallbackURL: ${fallbackURL}`,
+        `launchAppResult: ${JSON.stringify(launchResult)}`
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      showDetails([
+        ...baseDetailLines(),
+        `callbackURL: ${callbackURL}`,
+        `fallbackURL: ${fallbackURL}`,
+        `launchAppError: ${message || "unknown"}`
+      ]);
+    }
+  }
+
   if (isDingTalk && typeof openLink === "function") {
     try {
-      await openLink({ url: callbackURL });
+      await openLink({ url: fallbackURL });
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : JSON.stringify(error);
       showDetails([
         ...baseDetailLines(),
         `callbackURL: ${callbackURL}`,
+        `fallbackURL: ${fallbackURL}`,
         `openLinkError: ${message || "unknown"}`
       ]);
     }
   }
 
-  window.location.href = callbackURL;
+  window.location.href = fallbackURL;
 }
 
 function jumpBackToZenSee(queryParams) {
-  const callbackURL = buildReturnURL(queryParams);
-  void openCallbackURL(callbackURL);
+  const appCallbackURL = buildAppReturnURL(queryParams);
+  const fallbackURL = buildReturnURL(queryParams);
+  void openCallbackURL(appCallbackURL, fallbackURL);
 }
 
 function describeEnvironment() {
@@ -179,11 +226,11 @@ async function requestAuthorization() {
   }
 }
 
-returnLink.href = DEFAULT_RETURN_URL;
+returnLink.href = DEFAULT_APP_RETURN_URL;
 retryButton.addEventListener("click", requestAuthorization);
 returnLink.addEventListener("click", (event) => {
   event.preventDefault();
-  void openCallbackURL(returnLink.href || DEFAULT_RETURN_URL);
+  void openCallbackURL(returnLink.href || DEFAULT_APP_RETURN_URL, buildReturnURL({}));
 });
 describeEnvironment();
 
