@@ -4,18 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>ZenSee 钉钉登录回调</title>
+  <title>ZenSee 钉钉 CorpId 获取工具</title>
   <style>
     :root {
       color-scheme: light;
       --bg-top: #eef7ff;
       --bg-bottom: #dbeafe;
-      --surface: rgba(255, 255, 255, 0.82);
+      --surface: rgba(255, 255, 255, 0.84);
       --line: rgba(15, 23, 42, 0.1);
       --text: #10233a;
       --muted: #526173;
       --accent: #1677ff;
       --accent-deep: #0b5bd3;
+      --success: #0f9f62;
+      --success-bg: rgba(15, 159, 98, 0.1);
+      --danger: #c74343;
+      --danger-bg: rgba(199, 67, 67, 0.1);
     }
 
     * {
@@ -29,7 +33,7 @@
       place-items: center;
       padding: 24px;
       background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 28%),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 28%),
         radial-gradient(circle at right, rgba(22, 119, 255, 0.18), transparent 32%),
         linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
       color: var(--text);
@@ -37,7 +41,7 @@
     }
 
     main {
-      width: min(560px, 100%);
+      width: min(620px, 100%);
       padding: 28px 24px;
       border-radius: 28px;
       background: var(--surface);
@@ -94,29 +98,25 @@
       margin-top: 6px;
     }
 
-    .actions {
-      display: grid;
-      gap: 12px;
-      margin-top: 22px;
-    }
-
-    a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 48px;
-      padding: 12px 18px;
-      border-radius: 999px;
-      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
-      color: #fff;
-      text-decoration: none;
-      font-weight: 700;
-    }
-
-    a.secondary {
-      background: rgba(255, 255, 255, 0.72);
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 18px;
       border: 1px solid var(--line);
-      color: var(--text);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--success);
+      background: var(--success-bg);
+      border-color: rgba(15, 159, 98, 0.2);
+    }
+
+    .status.error {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: rgba(199, 67, 67, 0.2);
     }
 
     code {
@@ -131,31 +131,168 @@
       word-break: break-all;
       white-space: pre-wrap;
     }
+
+    .actions {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    a,
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-deep) 100%);
+      color: #fff;
+      text-decoration: none;
+      font: inherit;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+    }
+
+    a.secondary,
+    button.secondary {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
   <main>
-    <div class="badge">DingTalk OAuth Redirect</div>
-    <h1>ZenSee 钉钉登录回调页</h1>
-    <p id="summary">这个地址用于钉钉开放平台登录回调校验。正常情况下，授权完成后会自动返回 ZenSee App。</p>
-    <p id="hint">如果当前仍停留在浏览器，请返回 ZenSee 后重新尝试登录。</p>
+    <div class="badge">DingTalk CorpId Helper</div>
+    <h1>ZenSee 钉钉 CorpId 获取工具</h1>
+    <p id="summary">这个页面用于一次性获取钉钉组织的 CorpId，建议使用桌面浏览器完成操作。</p>
+    <p id="hint">拿到 CorpId 后，把它发给 Codex，我再继续把钉钉 App 内登录方案接完。</p>
+
     <div class="panel">
-      <strong>如果没有自动回到 App</strong>
+      <strong>使用方法</strong>
       <ol>
-        <li>确认设备上已安装最新版本钉钉和 ZenSee。</li>
-        <li>返回 ZenSee，重新点击“钉钉登录”。</li>
-        <li>若问题持续，请检查钉钉开放平台中的 Redirect URI 是否与当前页面地址完全一致。</li>
+        <li>点击下方“开始获取 CorpId”。</li>
+        <li>在钉钉授权页确认授权。</li>
+        <li>页面会自动解析并展示 CorpId。</li>
       </ol>
     </div>
-    <code id="link-preview"></code>
+
+    <div id="status" class="status">等待发起钉钉授权。</div>
+    <code id="result">callback: https://iveszhan.github.io/zensee/dingtalk-auth/</code>
+
     <div class="actions">
-      <a href="https://iveszhan.github.io/zensee/">打开 ZenSee 通用链接页</a>
-      <a class="secondary" href="https://apps.apple.com/app/6760809128">下载 iOS 版</a>
+      <a id="start-link" href="#">开始获取 CorpId</a>
+      <button id="copy-button" class="secondary" hidden>复制 CorpId</button>
+      <a class="secondary" href="https://open-dingtalk.github.io/developerpedia/docs/develop/permission/token/browser/get_user_app_token_browser/">查看钉钉官方说明</a>
     </div>
   </main>
+
   <script>
-    const preview = document.getElementById("link-preview");
-    preview.textContent = window.location.href;
+    const DINGTALK_CLIENT_ID = "dinggfbar3acbwmhawve";
+    const SUPABASE_FUNCTION_URL = "https://iqoxyfztxyiqpyqpvoub.supabase.co/functions/v1/social-login-cn";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxb3h5Znp0eHlpcXB5cXB2b3ViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzI2NDYsImV4cCI6MjA4ODAwODY0Nn0.jxCNir811FAcy2O1CL8kjkZk4g3rM5t4hxdodCYeiWI";
+
+    const summary = document.getElementById("summary");
+    const hint = document.getElementById("hint");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    const startLink = document.getElementById("start-link");
+    const copyButton = document.getElementById("copy-button");
+
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get("authCode") || params.get("code");
+    const state = params.get("state") || "";
+    const error = params.get("error");
+    const callbackURL = `${window.location.origin}${window.location.pathname}`;
+    let resolvedCorpId = "";
+
+    function setStatus(message, type) {
+      status.textContent = message;
+      status.className = type ? `status ${type}` : "status";
+    }
+
+    function buildAuthorizationURL() {
+      const authorizationURL = new URL("https://login.dingtalk.com/oauth2/auth");
+      authorizationURL.searchParams.set("client_id", DINGTALK_CLIENT_ID);
+      authorizationURL.searchParams.set("redirect_uri", callbackURL);
+      authorizationURL.searchParams.set("state", `get-corpid-${Date.now()}`);
+      authorizationURL.searchParams.set("response_type", "code");
+      authorizationURL.searchParams.set("prompt", "consent");
+      authorizationURL.searchParams.set("scope", "openid corpid");
+      return authorizationURL.toString();
+    }
+
+    async function resolveCorpIdFromAuthCode(code) {
+      const response = await fetch(SUPABASE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          provider: "dingtalk",
+          code,
+          state,
+          mode: "resolve_corp_id"
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "未能解析 CorpId，请稍后重试。");
+      }
+
+      if (!payload.corpId) {
+        throw new Error("当前授权未返回 CorpId，请确认 scope 包含 openid 和 corpid。");
+      }
+
+      return payload.corpId;
+    }
+
+    async function copyCorpId() {
+      if (!resolvedCorpId) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(resolvedCorpId);
+        setStatus("CorpId 已复制到剪贴板。", "success");
+      } catch (copyError) {
+        setStatus("复制失败，请手动复制下方结果。", "error");
+      }
+    }
+
+    startLink.href = buildAuthorizationURL();
+    copyButton.addEventListener("click", copyCorpId);
+
+    if (error) {
+      summary.textContent = "钉钉授权未完成。";
+      hint.textContent = "如果是用户取消授权，直接重新发起即可。";
+      setStatus(`授权失败：${error}`, "error");
+      result.textContent = window.location.href;
+    } else if (authCode) {
+      summary.textContent = "已收到钉钉授权码，正在解析 CorpId。";
+      hint.textContent = "请保持页面打开，通常几秒内会返回结果。";
+      setStatus("正在通过 Supabase 解析 CorpId...", "");
+      result.textContent = `authCode: ${authCode}\nstate: ${state || "(empty)"}`;
+
+      resolveCorpIdFromAuthCode(authCode)
+        .then((corpId) => {
+          resolvedCorpId = corpId;
+          summary.textContent = "CorpId 已解析成功。";
+          hint.textContent = "把下面这个 CorpId 发给 Codex，我继续接钉钉 App 内登录。";
+          setStatus("解析完成。", "success");
+          result.textContent = `corpId: ${corpId}`;
+          copyButton.hidden = false;
+        })
+        .catch((fetchError) => {
+          setStatus(fetchError.message || "解析 CorpId 失败。", "error");
+          hint.textContent = "把这条错误信息发给 Codex，我继续帮你排查。";
+        });
+    }
   </script>
 </body>
 </html>
