@@ -1,7 +1,7 @@
 import { openLink } from "dingtalk-jsapi";
 import { openAuth } from "dingtalk-design-libs/biz/openAuth";
 
-const DEFAULT_RETURN_URL = "zensee://auth/dingtalk-login";
+const DEFAULT_RETURN_URL = "https://iveszhan.github.io/zensee/dingtalk-auth/";
 const DEFAULT_CLIENT_ID = "dinggfbar3acbwmhawve";
 const DEFAULT_CORP_ID = "dingb30bc4a6f95b2caf";
 const DEFAULT_SCOPE = "Contact.User.Read";

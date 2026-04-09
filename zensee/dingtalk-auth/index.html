@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>ZenSee 钉钉 CorpId 获取工具</title>
+  <title>ZenSee 钉钉回调页</title>
   <style>
     :root {
       color-scheme: light;
@@ -165,9 +165,9 @@
 </head>
 <body>
   <main>
-    <div class="badge">DingTalk CorpId Helper</div>
-    <h1>ZenSee 钉钉 CorpId 获取工具</h1>
-    <p id="summary">这个页面用于一次性获取钉钉组织的 CorpId，建议使用桌面浏览器完成操作。</p>
+    <div class="badge">DingTalk Callback</div>
+    <h1 id="title">ZenSee 钉钉回调页</h1>
+    <p id="summary">这个页面默认用于一次性获取钉钉组织的 CorpId，建议使用桌面浏览器完成操作。</p>
     <p id="hint">拿到 CorpId 后，把它发给 Codex，我再继续把钉钉 App 内登录方案接完。</p>
 
     <div class="panel">
@@ -184,6 +184,7 @@
 
     <div class="actions">
       <a id="start-link" href="#">开始获取 CorpId</a>
+      <a id="app-return-link" class="secondary" href="#" hidden>打开 ZenSee</a>
       <button id="copy-button" class="secondary" hidden>复制 CorpId</button>
       <a class="secondary" href="https://open-dingtalk.github.io/developerpedia/docs/develop/permission/token/browser/get_user_app_token_browser/">查看钉钉官方说明</a>
     </div>
@@ -194,18 +195,23 @@
     const SUPABASE_FUNCTION_URL = "https://iqoxyfztxyiqpyqpvoub.supabase.co/functions/v1/social-login-cn";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxb3h5Znp0eHlpcXB5cXB2b3ViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzI2NDYsImV4cCI6MjA4ODAwODY0Nn0.jxCNir811FAcy2O1CL8kjkZk4g3rM5t4hxdodCYeiWI";
 
+    const title = document.getElementById("title");
     const summary = document.getElementById("summary");
     const hint = document.getElementById("hint");
     const status = document.getElementById("status");
     const result = document.getElementById("result");
     const startLink = document.getElementById("start-link");
+    const appReturnLink = document.getElementById("app-return-link");
     const copyButton = document.getElementById("copy-button");
 
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get("authCode") || params.get("code");
+    const provider = params.get("provider") || "";
     const state = params.get("state") || "";
     const error = params.get("error");
     const callbackURL = `${window.location.origin}${window.location.pathname}`;
+    const appReturnURL = `zensee://auth/dingtalk-login?provider=dingtalk&code=${encodeURIComponent(authCode || "")}&state=${encodeURIComponent(state)}`;
+    const isAppLoginCallback = provider === "dingtalk" && !!authCode;
     let resolvedCorpId = "";
 
     function setStatus(message, type) {
@@ -267,8 +273,18 @@
 
     startLink.href = buildAuthorizationURL();
     copyButton.addEventListener("click", copyCorpId);
+    appReturnLink.href = appReturnURL;
 
-    if (error) {
+    if (isAppLoginCallback) {
+      title.textContent = "钉钉授权已完成";
+      summary.textContent = "已经拿到钉钉授权码，ZenSee 正常情况下会通过 Universal Link 自动打开。";
+      hint.textContent = "如果没有自动打开，请点击“打开 ZenSee”。如果仍然没有反应，把这个页面完整内容发给 Codex。";
+      setStatus("已收到登录授权码。", "success");
+      result.textContent = `provider: ${provider}\nauthCode: ${authCode}\nstate: ${state || "(empty)"}\nappReturnURL: ${appReturnURL}`;
+      appReturnLink.hidden = false;
+      startLink.hidden = true;
+      copyButton.hidden = true;
+    } else if (error) {
       summary.textContent = "钉钉授权未完成。";
       hint.textContent = "如果是用户取消授权，直接重新发起即可。";
       setStatus(`授权失败：${error}`, "error");
