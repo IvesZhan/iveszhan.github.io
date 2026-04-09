@@ -1,3 +1,4 @@
+import { openLink } from "dingtalk-jsapi";
 import { openAuth } from "dingtalk-design-libs/biz/openAuth";
 
 const DEFAULT_RETURN_URL = "zensee://auth/dingtalk-login";
@@ -45,23 +46,52 @@ function showDetails(lines) {
   detailsNode.textContent = lines.join("\n");
 }
 
-function jumpBackToZenSee(queryParams) {
-  const callbackURL = buildReturnURL(queryParams);
-  returnLink.href = callbackURL;
-  window.location.href = callbackURL;
-}
-
-function describeEnvironment() {
-  const userAgent = navigator.userAgent || "";
-  const isDingTalk = /DingTalk/i.test(userAgent);
-  showDetails([
+function baseDetailLines() {
+  return [
     `clientId: ${clientId}`,
     `corpId: ${corpId}`,
     `scope: ${DEFAULT_SCOPE}`,
     `state: ${state || "(empty)"}`,
     `returnTo: ${returnTo}`,
-    `env: ${isDingTalk ? "DingTalk" : "Browser"}`
+    `env: ${/DingTalk/i.test(navigator.userAgent || "") ? "DingTalk" : "Browser"}`,
+    `openLink: ${typeof openLink === "function" ? "available" : "missing"}`
+  ];
+}
+
+async function openCallbackURL(callbackURL) {
+  returnLink.href = callbackURL;
+  showDetails([
+    ...baseDetailLines(),
+    `callbackURL: ${callbackURL}`
   ]);
+
+  const isDingTalk = /DingTalk/i.test(navigator.userAgent || "");
+  if (isDingTalk && typeof openLink === "function") {
+    try {
+      await openLink({ url: callbackURL });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
+      showDetails([
+        ...baseDetailLines(),
+        `callbackURL: ${callbackURL}`,
+        `openLinkError: ${message || "unknown"}`
+      ]);
+    }
+  }
+
+  window.location.href = callbackURL;
+}
+
+function jumpBackToZenSee(queryParams) {
+  const callbackURL = buildReturnURL(queryParams);
+  void openCallbackURL(callbackURL);
+}
+
+function describeEnvironment() {
+  const userAgent = navigator.userAgent || "";
+  const isDingTalk = /DingTalk/i.test(userAgent);
+  showDetails(baseDetailLines());
 
   if (!isDingTalk) {
     titleNode.textContent = "请在钉钉内完成授权";
@@ -151,6 +181,10 @@ async function requestAuthorization() {
 
 returnLink.href = DEFAULT_RETURN_URL;
 retryButton.addEventListener("click", requestAuthorization);
+returnLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  void openCallbackURL(returnLink.href || DEFAULT_RETURN_URL);
+});
 describeEnvironment();
 
 if (autoStart) {
