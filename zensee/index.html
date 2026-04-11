@@ -130,7 +130,7 @@
     </div>
     <code id="link-preview"></code>
     <div class="actions">
-      <a id="primary-link" href="https://iveszhan.github.io/zensee-web/">前往禅·见官网</a>
+      <a id="primary-link" href="https://iveszhan.github.io/zensee-web/" hidden>前往禅·见官网</a>
       <a class="secondary" id="ios-download-link" href="https://apps.apple.com/app/6760809128">下载 iOS 版</a>
       <a class="secondary" id="android-download-link" href="https://www.pgyer.com/zensee-android">下载 Android 版</a>
     </div>
@@ -355,6 +355,7 @@
     guideTitle.textContent = copy.defaultGuideTitle;
     renderSteps(copy.defaultGuideSteps);
     primaryLink.textContent = copy.primaryWebsiteLabel;
+    primaryLink.hidden = false;
     iosDownloadLink.textContent = copy.iosDownloadLabel;
     androidDownloadLink.href = resolvedAndroidDownloadLink();
     androidDownloadLink.textContent = copy.androidDownloadLabel;
