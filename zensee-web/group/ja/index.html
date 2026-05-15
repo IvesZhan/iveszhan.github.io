@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fef9f1" />
+  <meta name="theme-color" content="#fef9f1" />
+  <title>禅·見 | グループ招待</title>
+  <meta name="description" content="禅·見 の招待リンクを開き、グループ詳細を確認してアプリから参加できます。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="禅·見 | グループ招待" />
+  <meta property="og:description" content="禅·見 の招待リンクを開き、グループ詳細を確認してアプリから参加できます。" />
+  <meta property="og:url" content="https://iveszhan.github.io/zensee-web/group/ja/" />
+  <meta property="og:image" content="https://iveszhan.github.io/zensee-web/assets/images/brand/favicon.png" />
+  <meta property="og:image:width" content="256" />
+  <meta property="og:image:height" content="256" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="禅·見 | グループ招待" />
+  <meta name="twitter:description" content="禅·見 の招待リンクを開き、グループ詳細を確認してアプリから参加できます。" />
+  <meta name="twitter:image" content="https://iveszhan.github.io/zensee-web/assets/images/brand/favicon.png" />
+  <link rel="icon" type="image/png" href="../../assets/images/brand/favicon.png?v=1" />
+  <link rel="apple-touch-icon" href="../../assets/images/brand/favicon.png?v=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Noto+Serif:wght@400;700;800&amp;display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../shared-header.css?v=20260405b" />
+  <link rel="stylesheet" href="../web.css" />
+</head>
+<body>
+  <div class="page-shell" id="top">
+    <div
+      id="shared-header"
+      data-header-locale="ja"
+      data-header-home-url="../../download/ja/"
+      data-header-support-url="https://iveszhan.github.io/zensee-web/support/ja/"
+      data-header-icon-src="../../assets/images/brand/meditation-icon.png"
+      data-header-action-label="ダウンロード"
+      data-header-action-url="../../download/ja/"
+      data-header-mobile-label="ダウンロード"
+      data-header-mobile-url="../../download/ja/"
+      data-header-mobile-download="true"
+    ></div>
+
+    <main class="page-main">
+      <section class="group-hero" id="content-state">
+        <div class="hero-status" id="page-status">グループ詳細を読み込み中…</div>
+        <h1 id="group-name">グループ詳細</h1>
+        <p class="owner-line" id="group-owner-line">グループ主：禅友</p>
+        <div class="description-card">
+          <p id="group-description">この招待カードに含まれる公開グループ情報を読み込んでいます。</p>
+        </div>
+      </section>
+
+      <section class="members-section" id="members-section" hidden>
+        <h2>グループメンバー</h2>
+        <div class="member-shell">
+          <div class="member-list" id="member-list"></div>
+        </div>
+      </section>
+
+      <section class="error-state" id="error-state" hidden>
+        <h2 id="error-title">グループ詳細</h2>
+        <p id="error-body">現在グループ詳細を読み込めません。後でもう一度お試しください。</p>
+      </section>
+    </main>
+  </div>
+
+  <div class="join-bar">
+    <div class="join-bar-inner">
+      <p class="join-note">自動で開かない場合は、右上のメニューからシステム標準ブラウザで開いてください。</p>
+    </div>
+  </div>
+
+  <script src="../../download/config.js"></script>
+  <script src="../../shared-header.js?v=20260405b"></script>
+  <script src="../../download/app.js"></script>
+  <script src="../config.js"></script>
+  <script src="../app.js"></script>
+</body>
+</html>
