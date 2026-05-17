@@ -264,7 +264,7 @@
   }
 
   function androidIntentGroupLink(groupId) {
-    var fallbackURL = String(config.downloadPageURL || "https://iveszhan.github.io/zensee-web/download/");
+    var fallbackURL = String(config.downloadPageURL || "https://iveszhan.github.io/zensee/web/download/");
     return "intent://group/join?id=" + encodeURIComponent(groupId) +
       "#Intent;scheme=zensee;package=com.yuzhan.zenseeapp;S.browser_fallback_url=" +
       encodeURIComponent(fallbackURL) + ";end";

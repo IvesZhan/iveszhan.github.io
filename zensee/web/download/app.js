@@ -55,7 +55,7 @@
   var primary = buttons.length > 0 ? buttons[0] : null;
   var pageFallback = primary ? primary.getAttribute("href") : "";
   var fallback = isConfigured(links.fallback) ? links.fallback :
-    (isConfigured(pageFallback) ? pageFallback : "https://iveszhan.github.io/zensee-web/support/");
+    (isConfigured(pageFallback) ? pageFallback : "https://iveszhan.github.io/zensee/web/support/");
   var iosLink = isConfigured(links.ios) ? links.ios : fallback;
   var locale = normalizeLocale(document.documentElement.lang || navigator.language);
   var androidLink = resolveAndroidLink(locale, links, fallback);
