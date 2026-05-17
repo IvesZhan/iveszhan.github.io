@@ -29,6 +29,9 @@ It is a shared static hosting target for public project pages, app links, OAuth/
     dingtalk-auth/                   ZenSee DingTalk auth callback
     wechat-sdk/                      ZenSee WeChat SDK callback
 
+  ai-interior-design-platform/       AI Interior Design Platform namespace
+    web/                             AI 家装设计系统级 Web 工作台
+
   zensee-web/                        Legacy ZenSee compatibility redirects
 ```
 
@@ -72,6 +75,18 @@ Its workflow publishes:
 ```text
 ZenSee-Web/                     -> /zensee/web/
 ZenSee-Web/github-pages/zensee/ -> /zensee/
+```
+
+For AI Interior Design Platform, the source of truth is:
+
+```text
+IvesZhan/ai-interior-design-platform
+```
+
+Its static web app is published as:
+
+```text
+apps/web/ -> /ai-interior-design-platform/web/
 ```
 
 ## Root association files
