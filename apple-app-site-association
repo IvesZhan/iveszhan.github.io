@@ -8,8 +8,7 @@
           "/zensee",
           "/zensee/",
           "/zensee/*",
-          "/zensee-web/group/*",
-          "/wechat-sdk/*"
+          "/zensee-web/group/*"
         ]
       }
     ]
