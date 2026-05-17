@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Interior Design Platform</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="项目导航">
+        <div class="brand">
+          <span class="brand-mark">AI</span>
+          <div>
+            <p>Interior Design</p>
+            <strong>Platform</strong>
+          </div>
+        </div>
+
+        <button class="new-project" type="button">新项目</button>
+
+        <nav class="project-list" aria-label="项目列表">
+          <button class="project-item is-active" type="button" data-project="yixingyuan">
+            <span>益兴园</span>
+            <small>VR 全景样例</small>
+          </button>
+          <button class="project-item" type="button" data-project="template">
+            <span>系统模板</span>
+            <small>风格包 / 资产库</small>
+          </button>
+        </nav>
+      </aside>
+
+      <section class="workspace" aria-label="系统工作台">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">AI 版酷家乐 · 系统工作台</p>
+            <h1 id="projectTitle">益兴园方案工作流</h1>
+          </div>
+          <a class="preview-link" href="./" data-local-preview="../../web/yixingyuan-3d/">系统首页</a>
+        </header>
+
+        <section class="stage-grid" aria-label="项目流水线">
+          <article class="stage-card is-done">
+            <span>01</span>
+            <h2>资料导入</h2>
+            <p>DXF、设计说明、效果图、全景图进入统一项目目录。</p>
+          </article>
+          <article class="stage-card is-done">
+            <span>02</span>
+            <h2>户型解析</h2>
+            <p>房间 polygon、墙体、门窗、重点空间结构化。</p>
+          </article>
+          <article class="stage-card is-active">
+            <span>03</span>
+            <h2>风格与资产</h2>
+            <p>从参考图沉淀风格包、材质库和资产意图。</p>
+          </article>
+          <article class="stage-card">
+            <span>04</span>
+            <h2>可编辑交付</h2>
+            <p>Web 端切换风格、替换材质、调整软装并重渲染。</p>
+          </article>
+        </section>
+
+        <section class="control-grid">
+          <article class="panel style-panel">
+            <div class="panel-head">
+              <h2>风格包</h2>
+              <span id="styleStatus">中古风</span>
+            </div>
+            <div class="style-options" id="styleOptions" aria-label="风格选择"></div>
+          </article>
+
+          <article class="panel room-panel">
+            <div class="panel-head">
+              <h2>空间</h2>
+              <span id="roomStatus">客餐厅</span>
+            </div>
+            <div class="room-switcher" id="roomSwitcher" aria-label="空间切换"></div>
+            <div class="room-summary" id="roomSummary"></div>
+          </article>
+
+          <article class="panel asset-panel">
+            <div class="panel-head">
+              <h2>资产库</h2>
+              <span>雏形</span>
+            </div>
+            <div class="asset-list" id="assetList"></div>
+          </article>
+        </section>
+
+        <section class="delivery-panel" aria-label="交付状态">
+          <div>
+            <p class="eyebrow">下一步</p>
+            <h2 id="nextAction">把益兴园效果图沉淀成第一版中古风风格包</h2>
+          </div>
+          <div class="delivery-actions">
+            <button type="button" data-action="style">整理风格包</button>
+            <button type="button" data-action="asset">补资产索引</button>
+            <button type="button" data-action="editor">做可编辑状态</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
