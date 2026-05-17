@@ -7,7 +7,8 @@
         "paths": [
           "/zensee",
           "/zensee/",
-          "/zensee/*"
+          "/zensee/*",
+          "/zensee-web/group/*"
         ]
       }
     ]
