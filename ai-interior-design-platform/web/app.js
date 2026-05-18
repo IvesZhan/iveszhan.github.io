@@ -85,21 +85,9 @@ const availableSamples = canUseDesignerWorkspace
   : samples.filter((sample) => !sample.designerOnly);
 
 const body = document.body;
-const tabButtons = [...document.querySelectorAll("[data-tab]")];
 const panels = [...document.querySelectorAll("[data-panel]")];
 const accountLabel = document.querySelector("#accountLabel");
 const sampleList = document.querySelector("#sampleList");
-const roomStrip = document.querySelector("#roomStrip");
-const projectName = document.querySelector("#currentProjectName");
-const schemeImage = document.querySelector("#schemeImage");
-const schemeRoom = document.querySelector("#schemeRoom");
-const schemeVersion = document.querySelector("#schemeVersion");
-const schemeTitle = document.querySelector("#schemeTitle");
-const schemeSummary = document.querySelector("#schemeSummary");
-const schemeArea = document.querySelector("#schemeArea");
-const schemeStyle = document.querySelector("#schemeStyle");
-const schemeDelivery = document.querySelector("#schemeDelivery");
-const vrLink = document.querySelector("[data-local-preview]");
 const detailStatus = document.querySelector("#detailStatus");
 const detailTitle = document.querySelector("#detailTitle");
 const detailImage = document.querySelector("#detailImage");
@@ -111,6 +99,12 @@ const detailDelivery = document.querySelector("#detailDelivery");
 const detailRoomTabs = document.querySelector("#detailRoomTabs");
 const schemeTabButtons = [...document.querySelectorAll("[data-scheme-tab]")];
 const schemePanes = [...document.querySelectorAll("[data-scheme-pane]")];
+const importStepInputs = [...document.querySelectorAll("[data-import-step]")];
+const assetOptions = [...document.querySelectorAll("[data-asset-option]")];
+const importProgress = document.querySelector("[data-import-progress]");
+const generateButton = document.querySelector("[data-generate-plan]");
+const importSteps = ["floor", "brief", "references", "assets"];
+const importState = Object.fromEntries(importSteps.map((step) => [step, false]));
 
 let activeTab = "samples";
 let activeSampleId = availableSamples[0].id;
@@ -119,8 +113,10 @@ let activeRoomId = availableSamples[0].rooms[0].id;
 applyRole();
 configureLocalPreview();
 bindNavigation();
+bindImportWorkflow();
 renderSampleList();
 renderScheme();
+updateGenerateState();
 setTab(activeTab);
 
 function resolveAccountRole() {
@@ -136,23 +132,17 @@ function applyRole() {
 }
 
 function configureLocalPreview() {
-  if (!vrLink) {
-    return;
-  }
-
   const localHosts = ["localhost", "127.0.0.1", "::1", ""];
-  if (localHosts.includes(window.location.hostname)) {
-    vrLink.href = vrLink.dataset.localPreview;
-    vrLink.target = "_blank";
-    vrLink.rel = "noreferrer";
-  }
+  document.querySelectorAll("[data-local-preview]").forEach((link) => {
+    if (localHosts.includes(window.location.hostname)) {
+      link.href = link.dataset.localPreview;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+    }
+  });
 }
 
 function bindNavigation() {
-  tabButtons.forEach((button) => {
-    button.addEventListener("click", () => setTab(button.dataset.tab));
-  });
-
   document.querySelectorAll("[data-go-tab]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -167,13 +157,60 @@ function bindNavigation() {
     });
   });
 
-  document.querySelector("[data-back-to-library]")?.addEventListener("click", () => {
-    setTab("samples");
-  });
-
   schemeTabButtons.forEach((button) => {
     button.addEventListener("click", () => setSchemePane(button.dataset.schemeTab));
   });
+}
+
+function bindImportWorkflow() {
+  importStepInputs.forEach((input) => {
+    const label = input.closest(".upload-zone")?.querySelector("[data-upload-label]");
+    if (label) {
+      label.dataset.defaultLabel = label.textContent.trim();
+    }
+
+    input.addEventListener("change", () => {
+      const step = input.dataset.importStep;
+      importState[step] = input.files.length > 0;
+      updateUploadLabel(input);
+      updateGenerateState();
+    });
+  });
+
+  assetOptions.forEach((button) => {
+    button.addEventListener("click", () => {
+      button.classList.toggle("is-selected");
+      importState.assets = assetOptions.some((option) => option.classList.contains("is-selected"));
+      updateGenerateState();
+    });
+  });
+}
+
+function updateUploadLabel(input) {
+  const label = input.closest(".upload-zone")?.querySelector("[data-upload-label]");
+  if (!label) {
+    return;
+  }
+
+  label.textContent = input.files.length > 0 ? `已选择 ${input.files.length} 个文件` : label.dataset.defaultLabel;
+}
+
+function updateGenerateState() {
+  const completedCount = importSteps.filter((step) => importState[step]).length;
+  const isReady = completedCount === importSteps.length;
+
+  document.querySelectorAll("[data-step-card]").forEach((card) => {
+    card.classList.toggle("is-complete", Boolean(importState[card.dataset.stepCard]));
+  });
+
+  if (importProgress) {
+    importProgress.textContent = `${completedCount}/4 步已完成`;
+  }
+
+  if (generateButton) {
+    generateButton.disabled = !isReady;
+    generateButton.setAttribute("aria-disabled", String(!isReady));
+  }
 }
 
 function setTab(tab) {
@@ -182,12 +219,6 @@ function setTab(tab) {
   }
 
   activeTab = tab;
-
-  tabButtons.forEach((button) => {
-    const isActive = button.dataset.tab === tab;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", String(isActive));
-  });
 
   panels.forEach((panel) => {
     panel.classList.toggle("is-active", panel.dataset.panel === tab);
@@ -209,29 +240,70 @@ function setSchemePane(pane) {
 }
 
 function isDesignerTab(tab) {
-  const tabButton = tabButtons.find((button) => button.dataset.tab === tab);
-  return Boolean(tabButton?.hasAttribute("data-designer-only"));
+  const panel = panels.find((item) => item.dataset.panel === tab);
+  return Boolean(panel?.hasAttribute("data-designer-panel"));
 }
 
 function renderSampleList() {
-  sampleList.replaceChildren(
+  const cards = [];
+
+  if (canUseDesignerWorkspace) {
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "project-card add-project-card";
+    addButton.innerHTML = `
+      <span class="project-body">
+        <strong>导入生成空间方案</strong>
+        <small>完成户型、设计说明、参考图和本地资产选择，生成可进入详情页操作的空间方案。</small>
+        <span class="import-specs">
+          <span>CAD / DXF</span>
+          <span>参考图</span>
+          <span>本地资产</span>
+        </span>
+        <span class="add-link">开始导入</span>
+      </span>
+    `;
+    addButton.addEventListener("click", () => setTab("platform"));
+    cards.push(addButton);
+  }
+
+  cards.push(
     ...availableSamples.map((sample) => {
+      const room = sample.rooms[0];
       const button = document.createElement("button");
       button.type = "button";
-      button.className = sample.id === activeSampleId ? "scheme-card is-active" : "scheme-card";
+      button.className = sample.id === activeSampleId ? "project-card is-active" : "project-card";
       button.innerHTML = `
-        <span>${sample.status}</span>
-        <strong>${sample.name}</strong>
-        <small>${sample.title}</small>
+        <span class="project-thumb">
+          <img src="${room.image}" alt="${room.alt}" loading="lazy" />
+          <span class="status-pill">${sample.status}</span>
+        </span>
+        <span class="project-body">
+          <span class="project-eyebrow">${sample.delivery}</span>
+          <strong>${sample.name}</strong>
+          <small>${sample.title}</small>
+          <span class="project-summary">${sample.summary}</span>
+          <span class="project-stats" aria-label="方案参数">
+            <span><b>${sample.area}</b><em>面积</em></span>
+            <span><b>${sample.style}</b><em>风格</em></span>
+            <span><b>${sample.rooms.length}</b><em>空间</em></span>
+          </span>
+        </span>
       `;
       button.addEventListener("click", () => {
         activeSampleId = sample.id;
         activeRoomId = sample.rooms[0].id;
         renderSampleList();
         renderScheme();
+        setSchemePane("preview");
+        setTab("scheme-detail");
       });
       return button;
     })
+  );
+
+  sampleList.replaceChildren(
+    ...cards
   );
 }
 
@@ -239,16 +311,6 @@ function renderScheme() {
   const sample = availableSamples.find((item) => item.id === activeSampleId) ?? availableSamples[0];
   const room = sample.rooms.find((item) => item.id === activeRoomId) ?? sample.rooms[0];
 
-  projectName.textContent = `${sample.name} · ${sample.title}`;
-  schemeImage.src = room.image;
-  schemeImage.alt = room.alt;
-  schemeRoom.textContent = room.name;
-  schemeVersion.textContent = sample.status;
-  schemeTitle.textContent = `${sample.name} · ${sample.title}`;
-  schemeSummary.textContent = sample.summary;
-  schemeArea.textContent = sample.area;
-  schemeStyle.textContent = sample.style;
-  schemeDelivery.textContent = sample.delivery;
   detailStatus.textContent = sample.status;
   detailTitle.textContent = `${sample.name} · ${sample.title}`;
   detailImage.src = room.image;
@@ -258,20 +320,6 @@ function renderScheme() {
   detailArea.textContent = sample.area;
   detailStyle.textContent = sample.style;
   detailDelivery.textContent = sample.delivery;
-
-  roomStrip.replaceChildren(
-    ...sample.rooms.map((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = item.id === room.id ? "is-active" : "";
-      button.textContent = item.name;
-      button.addEventListener("click", () => {
-        activeRoomId = item.id;
-        renderScheme();
-      });
-      return button;
-    })
-  );
 
   detailRoomTabs.replaceChildren(
     ...sample.rooms.map((item) => {

@@ -8,97 +8,28 @@
       name="description"
       content="交换空间AI设计平台，用于展示、操作和生成 AI 家装空间方案。"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=workspace-clean" />
   </head>
   <body data-role="client">
     <header class="app-header">
-      <a class="brand" href="#samples" aria-label="交换空间AI设计平台">
-        <span class="brand-mark">交换</span>
+      <a class="brand" href="#samples" aria-label="交换空间AI设计平台" data-go-tab="samples">
+        <span class="brand-mark">AI</span>
         <span class="brand-copy">
           <strong>交换空间AI设计平台</strong>
           <small id="accountLabel">业主交付</small>
         </span>
       </a>
-
-      <div class="project-switcher" aria-label="当前方案">
-        <span>当前方案</span>
-        <strong id="currentProjectName">益兴园 · 中古风整屋方案</strong>
-      </div>
     </header>
 
-    <nav class="top-tabs" aria-label="平台导航">
-      <button class="is-active" type="button" data-tab="samples">方案库</button>
-      <button type="button" data-tab="platform" data-designer-only>导入生成</button>
-      <button type="button" data-tab="models" data-designer-only>模型库</button>
-      <button type="button" data-tab="resources" data-designer-only>资源库</button>
-    </nav>
-
     <main class="app-main">
-      <section class="view-panel is-active" id="samples" data-panel="samples" aria-label="样例方案">
-        <div class="scheme-shell">
-          <aside class="scheme-list" id="sampleList" aria-label="样例方案列表"></aside>
-
-          <article class="scheme-stage">
-            <div class="scheme-image">
-              <img
-                id="schemeImage"
-                src="./assets/living-dining.jpg"
-                alt="益兴园客餐厅效果图"
-                width="1280"
-                height="1727"
-              />
-              <div class="image-caption">
-                <span id="schemeRoom">客餐厅</span>
-                <strong id="schemeVersion">V2 · 业主确认版</strong>
-              </div>
-            </div>
-
-            <div class="scheme-inspector">
-              <div class="scheme-inspector-head">
-                <p class="kicker">当前样例</p>
-                <div class="scheme-actions">
-                  <button class="primary-action" type="button" data-open-scheme>
-                    打开方案
-                  </button>
-                  <a
-                    class="ghost-action"
-                    href="#"
-                    data-local-preview="../../web/yixingyuan-3d/"
-                  >
-                    打开 VR 全景
-                  </a>
-                </div>
-              </div>
-
-              <h2 id="schemeTitle">益兴园 · 中古风整屋方案</h2>
-              <p id="schemeSummary">
-                已完成客餐厅、餐厅、主卧等关键空间效果预览，支持进入方案工作区和 VR 全景查看。
-              </p>
-
-              <div class="room-strip" id="roomStrip" aria-label="空间切换"></div>
-
-              <dl class="scheme-meta">
-                <div>
-                  <dt>面积</dt>
-                  <dd id="schemeArea">128 m²</dd>
-                </div>
-                <div>
-                  <dt>风格</dt>
-                  <dd id="schemeStyle">中古风</dd>
-                </div>
-                <div>
-                  <dt>交付内容</dt>
-                  <dd id="schemeDelivery">效果图 + VR</dd>
-                </div>
-              </dl>
-            </div>
-          </article>
+      <section class="view-panel is-active" id="samples" data-panel="samples" aria-label="方案工作台">
+        <div class="workspace-shell">
+          <div class="project-grid" id="sampleList" aria-label="方案列表"></div>
         </div>
       </section>
 
       <section class="view-panel" id="schemeDetail" data-panel="scheme-detail" aria-label="方案详情">
         <div class="scheme-detail-header">
-          <button class="back-button" type="button" data-back-to-library>返回方案库</button>
           <div>
             <p id="detailStatus">V2 · 业主确认版</p>
             <h1 id="detailTitle">益兴园 · 中古风整屋方案</h1>
@@ -234,9 +165,15 @@
         data-designer-panel
         aria-label="设计师导入生成"
       >
-        <div class="import-layout">
-          <section class="file-specs" aria-label="导入文件要求">
-            <article>
+        <div class="import-workflow">
+          <div class="import-head">
+            <h1>新增方案</h1>
+            <span class="import-progress" data-import-progress>0/4 步已完成</span>
+          </div>
+
+          <section class="file-specs input-steps" aria-label="新增方案输入步骤">
+            <article class="step-card" data-step-card="floor">
+              <span class="step-index">01</span>
               <strong>户型文件</strong>
               <p>DXF 优先；DWG 需先转 DXF。单位 mm，1:1 绘制。</p>
               <ul>
@@ -244,11 +181,12 @@
                 <li>每个空间需要闭合边界和房间名称。</li>
               </ul>
               <label class="upload-zone">
-                <input type="file" accept=".dxf,.dwg" />
-                <span>上传 .dxf / .dwg</span>
+                <input type="file" accept=".dxf,.dwg" data-import-step="floor" />
+                <span data-upload-label>选择 .dxf / .dwg</span>
               </label>
             </article>
-            <article>
+            <article class="step-card" data-step-card="brief">
+              <span class="step-index">02</span>
               <strong>设计说明</strong>
               <p>TXT、PDF、DOCX。用于识别风格、预算、重点空间和规避项。</p>
               <ul>
@@ -256,11 +194,12 @@
                 <li>明确必须保留、需要规避、重点空间和效果图要求。</li>
               </ul>
               <label class="upload-zone">
-                <input type="file" accept=".txt,.pdf,.doc,.docx" />
-                <span>上传设计说明</span>
+                <input type="file" accept=".txt,.pdf,.doc,.docx" data-import-step="brief" />
+                <span data-upload-label>选择设计说明</span>
               </label>
             </article>
-            <article>
+            <article class="step-card" data-step-card="references">
+              <span class="step-index">03</span>
               <strong>参考图 / 全景图</strong>
               <p>JPG、PNG、WebP。全景图建议 2:1 比例，用于生成 VR 交付。</p>
               <ul>
@@ -268,70 +207,108 @@
                 <li>全景图建议 4096×2048 或 8192×4096。</li>
               </ul>
               <label class="upload-zone">
-                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple />
-                <span>上传图片资源</span>
-              </label>
-            </article>
-            <article>
-              <strong>资产参考</strong>
-              <p>家具、灯具、柜体、家电、材质样板和客户偏好。</p>
-              <ul>
-                <li>支持图片、PDF、GLB、GLTF、Blend。</li>
-                <li>上传后可沉淀到模型库或资源库。</li>
-              </ul>
-              <label class="upload-zone">
-                <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.glb,.gltf,.blend" multiple />
-                <span>上传资产参考</span>
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple data-import-step="references" />
+                <span data-upload-label>选择图片资源</span>
               </label>
             </article>
           </section>
 
-          <aside class="pipeline-card">
-            <div class="pipeline-head">
-              <h2>自动生成</h2>
-              <button class="primary-action" type="button">生成空间方案</button>
+          <section class="local-assets" data-step-card="assets" aria-label="本地资产参考">
+            <div class="local-assets-head">
+              <div>
+                <span class="step-index">04</span>
+                <strong>资产参考</strong>
+                <p>选择已经沉淀在本地模型库和资源库中的资产，作为本次方案生成的风格、家具、材质和灯光参考。</p>
+              </div>
             </div>
-            <ol>
-              <li><span>01</span>解析户型和空间边界</li>
-              <li><span>02</span>识别设计说明和风格约束</li>
-              <li><span>03</span>匹配模型、材质、灯光和相机</li>
-              <li><span>04</span>生成方案版本和 VR 预览</li>
-            </ol>
-          </aside>
+            <div class="asset-picker" aria-label="选择本地资产">
+              <button class="asset-option" type="button" data-asset-option>
+                <span class="asset-preview timber"></span>
+                <span>
+                  <strong>胡桃木餐边柜组合</strong>
+                  <small>模型库 · GLB · 客餐厅</small>
+                </span>
+              </button>
+              <button class="asset-option" type="button" data-asset-option>
+                <span class="asset-preview textile"></span>
+                <span>
+                  <strong>中古皮质沙发组</strong>
+                  <small>模型库 · GLB · 客厅</small>
+                </span>
+              </button>
+              <button class="asset-option" type="button" data-asset-option>
+                <span class="asset-preview stone"></span>
+                <span>
+                  <strong>暖白墙面与微水泥</strong>
+                  <small>资源库 · 材质 · 全屋</small>
+                </span>
+              </button>
+              <button class="asset-option" type="button" data-asset-option>
+                <span class="asset-preview lighting"></span>
+                <span>
+                  <strong>2700K 氛围灯光策略</strong>
+                  <small>资源库 · 灯光 · 效果图</small>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <div class="generation-footer">
+            <div>
+              <strong>自动生成空间方案</strong>
+              <small>完成户型文件、设计说明、参考图和资产参考后即可开始生成。</small>
+            </div>
+            <button class="primary-action generate-action" type="button" data-generate-plan disabled>
+              生成空间方案
+            </button>
+          </div>
         </div>
       </section>
 
       <section
         class="view-panel"
-        id="models"
-        data-panel="models"
+        id="assets"
+        data-panel="assets"
         data-designer-panel
-        aria-label="模型库"
+        aria-label="设计资产"
       >
-        <div class="library-grid">
-          <article><span>家具</span><strong>沙发、餐桌椅、床、书桌</strong><p>记录尺寸、风格、材质和适用空间。</p></article>
-          <article><span>定制柜</span><strong>电视柜、餐边柜、衣柜、橱柜</strong><p>后续支持参数化柜体。</p></article>
-          <article><span>灯具</span><strong>吊灯、筒灯、灯带、台灯</strong><p>绑定光源类型、色温和亮度。</p></article>
-          <article><span>洁具家电</span><strong>马桶、浴室柜、烟机、冰箱</strong><p>用于重点空间自动摆放和替换。</p></article>
+        <div class="panel-toolbar">
+          <div>
+            <p class="kicker">设计师工具</p>
+            <h1>设计资产</h1>
+          </div>
         </div>
-      </section>
 
-      <section
-        class="view-panel"
-        id="resources"
-        data-panel="resources"
-        data-designer-panel
-        aria-label="资源库"
-      >
-        <div class="resource-list">
-          <div><strong>风格包</strong><p>中古风、奶油风、现代简约、原木风。</p><span>持续补充</span></div>
-          <div><strong>材质库</strong><p>木地板、乳胶漆、瓷砖、石材、布艺、金属、玻璃。</p><span>雏形</span></div>
-          <div><strong>相机模板</strong><p>鸟瞰、客餐厅、厨房、主卧、全景 2:1 视角。</p><span>可复用</span></div>
-          <div><strong>CAD 图层规范</strong><p>WALL、ROOM-BOUNDARY、ROOM-TEXT、DOOR、WINDOW。</p><span>已定义</span></div>
+        <div class="asset-layout">
+          <section aria-label="模型库">
+            <div class="section-head">
+              <span>模型库</span>
+              <strong>可复用空间资产</strong>
+            </div>
+            <div class="library-grid">
+              <article><span>家具</span><strong>沙发、餐桌椅、床、书桌</strong><p>记录尺寸、风格、材质和适用空间。</p></article>
+              <article><span>定制柜</span><strong>电视柜、餐边柜、衣柜、橱柜</strong><p>后续支持参数化柜体。</p></article>
+              <article><span>灯具</span><strong>吊灯、筒灯、灯带、台灯</strong><p>绑定光源类型、色温和亮度。</p></article>
+              <article><span>洁具家电</span><strong>马桶、浴室柜、烟机、冰箱</strong><p>用于重点空间自动摆放和替换。</p></article>
+            </div>
+          </section>
+
+          <section aria-label="资源库">
+            <div class="section-head">
+              <span>资源库</span>
+              <strong>生成规则与交付规范</strong>
+            </div>
+            <div class="resource-list">
+              <div><strong>风格包</strong><p>中古风、奶油风、现代简约、原木风。</p><span>持续补充</span></div>
+              <div><strong>材质库</strong><p>木地板、乳胶漆、瓷砖、石材、布艺、金属、玻璃。</p><span>雏形</span></div>
+              <div><strong>相机模板</strong><p>鸟瞰、客餐厅、厨房、主卧、全景 2:1 视角。</p><span>可复用</span></div>
+              <div><strong>CAD 图层规范</strong><p>WALL、ROOM-BOUNDARY、ROOM-TEXT、DOOR、WINDOW。</p><span>已定义</span></div>
+            </div>
+          </section>
         </div>
       </section>
     </main>
 
-    <script src="./app.js" type="module"></script>
+    <script src="./app.js?v=workspace-clean" type="module"></script>
   </body>
 </html>
