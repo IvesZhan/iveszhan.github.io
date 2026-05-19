@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>交换空间品牌图标</title>
+  <defs>
+    <linearGradient id="space-main" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7fb9a8" />
+      <stop offset="1" stop-color="#4f8f7d" />
+    </linearGradient>
+    <linearGradient id="space-accent" x1="4" y1="18" x2="60" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8c991" />
+      <stop offset="1" stop-color="#a9cfba" />
+    </linearGradient>
+  </defs>
+  <path
+    fill="url(#space-main)"
+    d="M12 10h28v8H21v16h13v8H12V10Zm40 44H24v-8h19V30h9v24Z"
+  />
+  <path
+    fill="url(#space-accent)"
+    d="M40 18h10c5.5 0 10 4.5 10 10v7h-8v-6.4c0-1.4-1.2-2.6-2.6-2.6H40v-8ZM24 46H14c-5.5 0-10-4.5-10-10v-7h8v6.4c0 1.4 1.2 2.6 2.6 2.6H24v8Z"
+  />
+</svg>
