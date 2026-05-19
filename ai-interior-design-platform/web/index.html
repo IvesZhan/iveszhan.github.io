@@ -8,7 +8,7 @@
       name="description"
       content="交换空间设计平台，用于管理、生成和交付家装空间方案。"
     />
-    <link rel="stylesheet" href="./styles.css?v=natural-platform-two-style-workbench" />
+    <link rel="stylesheet" href="./styles.css?v=style-selected-theme" />
   </head>
   <body data-role="client">
     <header class="app-header">
@@ -35,7 +35,6 @@
 
       <section class="view-panel" id="schemeDetail" data-panel="scheme-detail" aria-label="方案详情">
         <div class="scheme-detail-header">
-          <button class="back-button" type="button" data-go-tab="samples">返回方案库</button>
           <div class="scheme-title-block">
             <p id="detailStatus">V2 · 业主确认版</p>
             <h1 id="detailTitle">益兴园 · 中古风整屋方案</h1>
@@ -43,8 +42,8 @@
           <nav class="scheme-tabs" aria-label="方案内部导航">
             <button class="is-active" type="button" data-scheme-tab="preview">预览</button>
             <button type="button" data-scheme-tab="adjust">调整</button>
-            <button type="button" data-scheme-tab="delivery">交付</button>
-            <button type="button" data-scheme-tab="versions">版本</button>
+            <button type="button" data-scheme-tab="delivery" data-final-only>交付</button>
+            <button type="button" data-scheme-tab="versions" data-final-only>版本</button>
           </nav>
         </div>
 
@@ -81,86 +80,45 @@
 
         <div class="scheme-pane" data-scheme-pane="adjust">
           <div class="detail-layout">
-            <section class="live-preview" aria-label="方案操作预览">
-              <img src="./assets/living-wide.jpg" alt="客厅方案预览" />
-              <div class="space-tabs" aria-label="空间切换">
-                <button class="is-active" type="button">客厅</button>
-                <button type="button">餐厅</button>
-                <button type="button">主卧</button>
-                <button type="button">卫生间</button>
-              </div>
+            <section class="live-preview adjust-preview" aria-label="方案操作预览">
+              <img id="adjustImage" src="./assets/living-wide.jpg" alt="当前场景预览" />
+              <div class="space-tabs" id="adjustSceneTabs" aria-label="调整场景切换"></div>
             </section>
 
             <aside class="decision-panel" aria-label="业主操作面板">
-              <div class="decision-section">
-                <span>风格方案</span>
-                <div class="option-row">
-                  <button class="is-active" type="button">当前中古风</button>
-                  <button type="button">偏奶油</button>
-                  <button type="button">更简洁</button>
+              <div class="adjust-panel-main">
+                <div class="decision-section style-lock-section">
+                  <div class="option-row">
+                    <button class="is-active" type="button" data-style-lock>当前风格</button>
+                  </div>
+                </div>
+
+                <div class="decision-section">
+                  <p class="adjust-scope" data-adjust-scope>选择一个场景后进行局部调整。</p>
+                </div>
+
+                <div class="decision-section">
+                  <div class="feedback-list" data-adjust-actions></div>
                 </div>
               </div>
 
-              <div class="decision-section">
-                <span>材质偏好</span>
-                <div class="material-options">
-                  <button type="button"><i style="background:#b98255"></i>胡桃木</button>
-                  <button type="button"><i style="background:#efe4d2"></i>暖白墙面</button>
-                  <button type="button"><i style="background:#777c68"></i>低饱和绿</button>
-                  <button type="button"><i style="background:#c7b59d"></i>微水泥</button>
+              <div class="adjust-panel-footer">
+                <div class="generation-status render-status" data-render-status aria-live="polite"></div>
+                <div class="decision-footer">
+                  <button class="primary-action" type="button" data-render-final>生成3D效果图</button>
+                  <button class="ghost-action" type="button" data-clear-adjustments>清空调整</button>
                 </div>
-              </div>
-
-              <div class="decision-section">
-                <span>反馈标注</span>
-                <div class="feedback-list">
-                  <button type="button">这里不满意</button>
-                  <button type="button">换一套餐桌椅</button>
-                  <button type="button">灯光再暖一点</button>
-                  <button type="button">保留这个空间</button>
-                </div>
-              </div>
-
-              <div class="decision-footer">
-                <button class="primary-action" type="button">保存为业主反馈版</button>
-                <button class="ghost-action" type="button">提交局部重生成</button>
               </div>
             </aside>
           </div>
         </div>
 
         <div class="scheme-pane" data-scheme-pane="delivery">
-          <div class="delivery-grid">
-            <article class="delivery-card large">
-              <img src="./assets/showcase/project-vintage.jpg" alt="客餐厅交付效果" />
-              <div>
-                <span>主交付图</span>
-                <strong>客餐厅 · 中古风确认版</strong>
-              </div>
-            </article>
-            <article class="delivery-card">
-              <img src="./assets/showcase/detail-kitchen.jpg" alt="餐厨效果图" />
-              <div>
-                <span>餐厨</span>
-                <strong>开放餐厨与收纳</strong>
-              </div>
-            </article>
-            <article class="delivery-card">
-              <img src="./assets/showcase/vr-panorama.jpg" alt="VR 全景预览" />
-              <div>
-                <span>VR 全景</span>
-                <strong>客户交付入口</strong>
-              </div>
-            </article>
-          </div>
+          <div data-delivery-content></div>
         </div>
 
         <div class="scheme-pane" data-scheme-pane="versions">
-          <div class="version-grid">
-            <article><span>V0</span><strong>原始解析版</strong><p>用于校对户型、墙体、门窗、空间边界。</p></article>
-            <article class="current"><span>V1</span><strong>初版方案</strong><p>风格、材质、灯光与镜头策略。</p></article>
-            <article><span>V2</span><strong>业主反馈版</strong><p>保留标注、偏好选择和局部重生成任务。</p></article>
-          </div>
+          <div data-version-list></div>
         </div>
       </section>
 
@@ -222,6 +180,7 @@
 
           <section class="workflow-section floor-section workbench-floor" data-step-card="floor" aria-label="图纸导入">
             <div class="upload-panel">
+              <div data-floor-preview aria-label="图纸预览"></div>
               <label class="upload-zone">
                 <input type="file" accept=".dxf,.dwg" data-import-step="floor" />
                 <span data-upload-label>上传图纸</span>
@@ -279,6 +238,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=natural-platform-two-style-workbench" type="module"></script>
+    <script src="./app.js?v=style-selected-theme" type="module"></script>
   </body>
 </html>
