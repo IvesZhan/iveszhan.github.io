@@ -565,8 +565,8 @@ body[data-role="client"] [data-designer-panel] {
 
 .adjust-panel-footer {
   display: grid;
-  gap: 16px;
-  padding-top: 22px;
+  gap: 10px;
+  padding-top: 14px;
   border-top: 1px solid rgb(122 154 139 / 13%);
 }
 
@@ -723,6 +723,12 @@ body[data-role="client"] [data-designer-panel] {
 .primary-action {
   color: #fffdf6;
   background: linear-gradient(135deg, var(--studio), color-mix(in srgb, var(--studio-2) 76%, var(--studio)));
+  border-color: transparent;
+}
+
+.primary-action.is-danger {
+  color: #fffdf6;
+  background: linear-gradient(135deg, #ba6258, color-mix(in srgb, #ba6258 78%, var(--clay)));
   border-color: transparent;
 }
 
@@ -1350,8 +1356,8 @@ body[data-role="client"] [data-designer-panel] {
 .file-validation,
 .generation-status {
   display: none;
-  gap: 8px;
-  padding: 13px 14px;
+  gap: 6px;
+  padding: 10px 12px;
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1.55;
@@ -1395,6 +1401,58 @@ body[data-role="client"] [data-designer-panel] {
   gap: 4px;
   margin: 0;
   padding-left: 17px;
+}
+
+.status-current-step {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 22px;
+}
+
+.status-step-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.status-current-step.is-running .status-step-icon::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(169 120 49 / 22%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  animation: status-spin 780ms linear infinite;
+}
+
+.status-current-step.is-complete .status-step-icon {
+  color: var(--studio);
+}
+
+.status-current-step.is-error .status-step-icon {
+  color: var(--danger);
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-current-step.is-running .status-step-icon::before {
+    animation: none;
+  }
 }
 
 .style-picker {

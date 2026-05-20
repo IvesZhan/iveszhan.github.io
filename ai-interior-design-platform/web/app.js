@@ -319,6 +319,10 @@ let effectBriefDocument = null;
 let isEditingEffectBrief = false;
 let isGeneratingPlan = false;
 let isRenderingFinal = false;
+let currentRenderJobId = "";
+let isStoppingRender = false;
+let generationStatusProgressTimer = null;
+let renderStatusProgressTimer = null;
 const generateButtonDefaultText = generateButton?.textContent.trim() || "生成空间方案";
 const adjustmentLabels = {
   storage: "收纳加强",
@@ -594,22 +598,23 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
   return response.json();
 }
 
-async function renderFinalVersionWithBackend(sample) {
+async function renderFinalVersionWithBackend(sample, onProgress = () => {}) {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     throw new Error("未配置本地后端地址，无法生成 3D 效果图。");
   }
-  if (!sample?.draft?.render_spec) {
+  const renderSpec = getBaseRenderSpecForFinalGeneration(sample);
+  if (!renderSpec) {
     throw new Error("当前方案没有可渲染的 RenderSpec，请重新从图纸生成初版方案。");
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/render/preview`, {
+  const response = await fetch(`${apiBaseUrl}/api/v1/render/preview/jobs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      render_spec: sample.draft.render_spec,
+      render_spec: renderSpec,
       adjustments: sample.adjustments || [],
       samples: 32,
       shot_ids: [],
@@ -620,7 +625,55 @@ async function renderFinalVersionWithBackend(sample) {
     throw new Error(await readApiError(response));
   }
 
-  return response.json();
+  const job = await response.json();
+  currentRenderJobId = job.job_id || "";
+  return pollRenderJob(apiBaseUrl, job.job_id, onProgress);
+}
+
+function getBaseRenderSpecForFinalGeneration(sample) {
+  const activeVersion = getActiveVersion(sample);
+  return activeVersion?.renderSpec || sample?.draft?.render_spec || null;
+}
+
+async function pollRenderJob(apiBaseUrl, jobId, onProgress) {
+  if (!jobId) {
+    throw new Error("后端没有返回渲染任务编号。");
+  }
+
+  while (true) {
+    await wait(1000);
+    const response = await fetch(`${apiBaseUrl}/api/v1/render/preview/jobs/${encodeURIComponent(jobId)}`);
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    const job = await response.json();
+    onProgress(job);
+
+    if (job.status === "complete") {
+      return {
+        status: "complete",
+        version_id: job.version_id,
+        scenes: job.scenes || [],
+        render_spec: job.render_spec,
+        messages: job.messages || [],
+      };
+    }
+
+    if (job.status === "error") {
+      throw new Error(job.error || job.messages?.[0] || "3D 渲染失败。");
+    }
+
+    if (job.status === "cancelled") {
+      const error = new Error("已停止当前 3D 效果图生成。");
+      error.name = "RenderCancelledError";
+      throw error;
+    }
+  }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function buildDesignBriefText(file, stylePackage) {
@@ -886,11 +939,17 @@ function clearCurrentAdjustments() {
 
 async function handleRenderFinalVersion() {
   const sample = getActiveSample();
-  if (!sample || isRenderingFinal) {
+  if (isRenderingFinal) {
+    await confirmAndStopRender();
+    return;
+  }
+  if (!sample) {
     return;
   }
 
   isRenderingFinal = true;
+  isStoppingRender = false;
+  currentRenderJobId = "";
   setRenderStatus({
     status: "running",
     title: "正在生成3D效果图",
@@ -899,9 +958,15 @@ async function handleRenderFinalVersion() {
   renderScheme();
 
   try {
-    const result = await renderFinalVersionWithBackend(sample);
+    const result = await renderFinalVersionWithBackend(sample, setRenderJobProgressStatus);
     const version = buildFinalVersion(sample, result);
     sample.phase = "final";
+    if (result.render_spec) {
+      sample.draft = {
+        ...(sample.draft || {}),
+        render_spec: result.render_spec,
+      };
+    }
     sample.versions = [...(sample.versions || []), version];
     sample.activeVersionId = version.id;
     sample.status = `${version.title} · 已生成`;
@@ -919,6 +984,15 @@ async function handleRenderFinalVersion() {
     renderScheme();
     setSchemePane("preview");
   } catch (error) {
+    if (error?.name === "RenderCancelledError") {
+      setRenderStatus({
+        status: "error",
+        title: "已停止生成",
+        messages: [error.message],
+      });
+      renderScheme();
+      return;
+    }
     setRenderStatus({
       status: "error",
       title: "3D生成失败",
@@ -927,8 +1001,73 @@ async function handleRenderFinalVersion() {
     renderScheme();
   } finally {
     isRenderingFinal = false;
+    isStoppingRender = false;
+    currentRenderJobId = "";
     renderScheme();
   }
+}
+
+async function confirmAndStopRender() {
+  if (!currentRenderJobId || isStoppingRender) {
+    return;
+  }
+
+  const shouldStop = window.confirm("确定停止当前 3D 效果图生成吗？已完成但尚未写入终版的渲染结果不会保存。");
+  if (!shouldStop) {
+    return;
+  }
+
+  isStoppingRender = true;
+  renderScheme();
+  setRenderStatus({
+    status: "running",
+    title: "正在停止生成",
+    messages: ["正在通知后端终止 Blender 渲染任务"],
+  });
+
+  try {
+    const apiBaseUrl = getApiBaseUrl();
+    const response = await fetch(`${apiBaseUrl}/api/v1/render/preview/jobs/${encodeURIComponent(currentRenderJobId)}/cancel`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+  } catch (error) {
+    isStoppingRender = false;
+    setRenderStatus({
+      status: "error",
+      title: "停止失败",
+      messages: [formatGenerationError(error)],
+    });
+    renderScheme();
+  }
+}
+
+function setRenderJobProgressStatus(job) {
+  if (!job || !["queued", "running"].includes(job.status)) {
+    return;
+  }
+
+  const percent = Math.max(0, Math.min(Math.round((Number(job.progress) || 0) * 100), 99));
+  const scene = formatRenderJobScene(job);
+  const step = job.current_step || "正在处理渲染任务";
+  setRenderStatus({
+    status: "running",
+    title: `正在生成3D效果图 · ${percent}%`,
+    messages: [`${scene}${scene ? " · " : ""}${step}`],
+  });
+}
+
+function formatRenderJobScene(job) {
+  const total = Number(job.total_shots) || 0;
+  const index = Number(job.current_shot_index) || 0;
+  if (!total || !index) {
+    return "";
+  }
+
+  const label = job.current_shot_label ? translateShotLabel(job.current_shot_label) : "当前场景";
+  return `第 ${index}/${total} 个场景：${label}`;
 }
 
 function buildFinalVersion(sample, result) {
@@ -949,6 +1088,7 @@ function buildFinalVersion(sample, result) {
     createdAt: new Date().toLocaleString("zh-CN", { hour12: false }),
     summary: buildFinalVersionSummary(sample, scenes, versionNumber),
     adjustments: [...(sample.adjustments || [])],
+    renderSpec: result.render_spec || getBaseRenderSpecForFinalGeneration(sample),
     scenes,
   };
 }
@@ -971,20 +1111,12 @@ function setGenerationStatus({ status, title, messages }) {
     return;
   }
 
-  generationStatusPanel.replaceChildren();
-  generationStatusPanel.className = `generation-status is-${status}`;
-
-  const heading = document.createElement("strong");
-  heading.textContent = title;
-  generationStatusPanel.append(heading);
-
-  const list = document.createElement("ul");
-  messages.forEach((message) => {
-    const item = document.createElement("li");
-    item.textContent = message;
-    list.append(item);
+  generationStatusProgressTimer = renderStatusSteps(generationStatusPanel, {
+    status,
+    title,
+    messages,
+    timer: generationStatusProgressTimer,
   });
-  generationStatusPanel.append(list);
 }
 
 function setRenderStatus({ status, title, messages }) {
@@ -992,38 +1124,125 @@ function setRenderStatus({ status, title, messages }) {
     return;
   }
 
-  renderStatusPanel.replaceChildren();
-  renderStatusPanel.className = `generation-status render-status is-${status}`;
+  renderStatusProgressTimer = renderStatusSteps(renderStatusPanel, {
+    status,
+    title,
+    messages,
+    timer: renderStatusProgressTimer,
+    extraClass: "render-status",
+  });
+}
+
+function renderStatusSteps(panel, { status, title, messages, timer, extraClass = "" }) {
+  const canUpdateInPlace = panel.dataset.statusKind === status && panel.querySelector(".status-current-step");
+  if (canUpdateInPlace && messages.length <= 1) {
+    if (timer) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+    const heading = panel.querySelector("strong");
+    if (heading) {
+      heading.textContent = title;
+    }
+    updateCurrentStatusStep(panel.querySelector(".status-current-step"), messages[0] || title, status);
+    return timer;
+  }
+
+  if (timer) {
+    window.clearInterval(timer);
+  }
+
+  panel.replaceChildren();
+  panel.className = ["generation-status", extraClass, `is-${status}`].filter(Boolean).join(" ");
+  panel.dataset.statusKind = status;
 
   const heading = document.createElement("strong");
   heading.textContent = title;
-  renderStatusPanel.append(heading);
+  panel.append(heading);
 
-  const list = document.createElement("ul");
-  messages.forEach((message) => {
-    const item = document.createElement("li");
-    item.textContent = message;
-    list.append(item);
-  });
-  renderStatusPanel.append(list);
+  const step = document.createElement("div");
+  step.className = "status-current-step";
+  panel.append(step);
+
+  if (status !== "running") {
+    updateCurrentStatusStep(step, messages[0] || title, status);
+    return null;
+  }
+
+  let activeIndex = 0;
+  updateCurrentStatusStep(step, messages[activeIndex] || title, status);
+
+  return window.setInterval(() => {
+    activeIndex = Math.min(activeIndex + 1, Math.max(messages.length - 1, 0));
+    updateCurrentStatusStep(step, messages[activeIndex] || title, status);
+  }, 1300);
+}
+
+function updateCurrentStatusStep(step, message, status) {
+  const nextClassName = `status-current-step is-${status}`;
+  if (step.className !== nextClassName) {
+    step.className = nextClassName;
+  }
+
+  let icon = step.querySelector(".status-step-icon");
+  if (!icon) {
+    icon = document.createElement("span");
+    icon.className = "status-step-icon";
+    icon.setAttribute("aria-hidden", "true");
+    step.append(icon);
+  }
+  icon.textContent = getStatusStepIcon(status);
+
+  let text = step.querySelector(".status-step-text");
+  if (!text) {
+    text = document.createElement("span");
+    text.className = "status-step-text";
+    step.append(text);
+  }
+  if (text.textContent !== message) {
+    text.textContent = message;
+  }
+}
+
+function getStatusStepIcon(status) {
+  if (status === "running") {
+    return "";
+  }
+  if (status === "complete") {
+    return "✓";
+  }
+  if (status === "error") {
+    return "!";
+  }
+  return "⏳";
 }
 
 function clearRenderStatus() {
   if (!renderStatusPanel || renderStatusPanel.classList.contains("is-running")) {
     return;
   }
+  if (renderStatusProgressTimer) {
+    window.clearInterval(renderStatusProgressTimer);
+    renderStatusProgressTimer = null;
+  }
 
   renderStatusPanel.replaceChildren();
   renderStatusPanel.className = "generation-status render-status";
+  delete renderStatusPanel.dataset.statusKind;
 }
 
 function clearGenerationStatus() {
   if (!generationStatusPanel || generationStatusPanel.classList.contains("is-running")) {
     return;
   }
+  if (generationStatusProgressTimer) {
+    window.clearInterval(generationStatusProgressTimer);
+    generationStatusProgressTimer = null;
+  }
 
   generationStatusPanel.replaceChildren();
   generationStatusPanel.className = "generation-status";
+  delete generationStatusPanel.dataset.statusKind;
 }
 
 function handleImportInputChange(input, files = input.files) {
@@ -2899,10 +3118,13 @@ function renderAdjustPanel(sample) {
   renderAdjustActions(sample, scene);
 
   if (renderFinalButton) {
-    renderFinalButton.disabled = isRenderingFinal || !sample.draft?.render_spec;
-    renderFinalButton.textContent = hasFinalVersion(sample)
-      ? `生成第 ${(sample.versions?.length || 0) + 1} 版终版3D效果图`
-      : "生成第一版终版3D效果图";
+    renderFinalButton.disabled = isStoppingRender || (!isRenderingFinal && !getBaseRenderSpecForFinalGeneration(sample));
+    renderFinalButton.classList.toggle("is-danger", isRenderingFinal);
+    renderFinalButton.textContent = isRenderingFinal
+      ? (isStoppingRender ? "正在停止生成" : "停止生成")
+      : hasFinalVersion(sample)
+        ? `生成第 ${(sample.versions?.length || 0) + 1} 版终版3D效果图`
+        : "生成第一版终版3D效果图";
   }
   if (clearAdjustmentsButton) {
     clearAdjustmentsButton.disabled = isRenderingFinal || !(sample.adjustments || []).length;
