@@ -172,6 +172,18 @@ const generateButton = document.querySelector("[data-generate-plan]");
 const generationStatusPanel = document.querySelector("[data-generation-status]");
 const floorValidationPanel = document.querySelector("[data-floor-validation]");
 const floorPreviewPanel = document.querySelector("[data-floor-preview]");
+const effectBriefInput = document.querySelector("[data-effect-brief-upload]");
+const effectBriefLabel = document.querySelector("[data-effect-brief-label]");
+const effectBriefSummary = document.querySelector("[data-effect-brief-summary]");
+const effectBriefViewAction = document.querySelector("[data-effect-brief-view-action]");
+const effectBriefViewer = document.querySelector("[data-effect-brief-viewer]");
+const effectBriefTitle = document.querySelector("[data-effect-brief-title]");
+const effectBriefMeta = document.querySelector("[data-effect-brief-meta]");
+const effectBriefContent = document.querySelector("[data-effect-brief-content]");
+const effectBriefEditor = document.querySelector("[data-effect-brief-editor]");
+const effectBriefEditButton = document.querySelector("[data-effect-brief-edit]");
+const effectBriefReuploadButton = document.querySelector("[data-effect-brief-reupload]");
+const effectBriefCloseButton = document.querySelector("[data-effect-brief-close]");
 const importSteps = ["floor", "style"];
 const importState = Object.fromEntries(importSteps.map((step) => [step, false]));
 const stylePackages = {
@@ -219,6 +231,12 @@ const stylePackages = {
       { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "原木风 VR 全景预览" },
     ],
   },
+};
+const effectBriefStyleAliases = {
+  vintage: ["中古风", "中古", "复古", "mid-century", "mid century", "vintage"],
+  cream: ["奶油风", "奶油", "cream"],
+  modern: ["现代简约", "现代", "简约", "modern", "minimal"],
+  wood: ["原木风", "原木", "日式原木", "wood"],
 };
 const acceptedFloorExtensions = [".dxf", ".dwg"];
 const requiredFloorLayerRules = [
@@ -281,6 +299,7 @@ const dxfLineworkTypes = new Set(["ARC", "CIRCLE", "ELLIPSE", "HATCH", "INSERT",
 const dxfTextTypes = new Set(["TEXT", "MTEXT"]);
 const dxfPolylineTypes = new Set(["LWPOLYLINE", "POLYLINE"]);
 const allFloorLayerRules = [...requiredFloorLayerRules, ...optionalFloorLayerRules];
+const acceptedEffectBriefExtensions = [".txt", ".md", ".markdown", ".docx"];
 const dxfMillimeterInsunits = "4";
 const floorPreviewWidth = 1600;
 const floorPreviewHeight = 1000;
@@ -296,6 +315,8 @@ let floorValidationState = { status: "empty", title: "", messages: [] };
 let floorValidationRunId = 0;
 let selectedFloorFile = null;
 let selectedStyleId = "";
+let effectBriefDocument = null;
+let isEditingEffectBrief = false;
 let isGeneratingPlan = false;
 let isRenderingFinal = false;
 const generateButtonDefaultText = generateButton?.textContent.trim() || "生成空间方案";
@@ -319,6 +340,27 @@ const adjustmentLabels = {
   shower: "淋浴区",
   "balcony-use": "阳台功能",
   privacy: "隐私遮挡",
+};
+const adjustmentPromptDeltas = {
+  storage: "增加当前空间的封闭收纳和展示收纳，但不改变墙体、门窗和主要动线。",
+  "warmer-light": "将当前空间灯光调整为更暖的色温，并增加柔和辅助光。",
+  brighter: "提升当前空间整体亮度，墙面和顶面保持更干净明亮。",
+  simpler: "减少非必要装饰和模型数量，让空间更简洁。",
+  "layout-flow": "优化全屋动线，保留通行宽度，避免家具阻挡门窗和主要通道。",
+  "sofa-layout": "优化沙发和茶几位置，让客餐厅核心视角更完整。",
+  "tv-wall": "强化电视墙或背景墙设计，保持当前风格一致。",
+  dining: "优化餐桌椅和餐边收纳关系，保留就餐和通行尺度。",
+  "bed-wall": "强化床头背景墙和卧室主视觉。",
+  wardrobe: "增强卧室衣柜和储物能力。",
+  bedside: "增加床头灯和柔和卧室氛围光。",
+  "countertop-flow": "优化厨房台面操作动线和连续操作面。",
+  "cabinet-storage": "增强厨房上下柜收纳。",
+  appliances: "优化厨房电器、灶台和水槽的布局关系。",
+  "dry-wet": "强化卫生间干湿分区表达。",
+  vanity: "优化浴室柜和镜柜收纳。",
+  shower: "强化淋浴区表达。",
+  "balcony-use": "明确阳台功能，避免仅作为空白空间。",
+  privacy: "增加当前空间的隐私遮挡和柔和隔断感。",
 };
 
 applyRole();
@@ -419,6 +461,25 @@ function bindImportWorkflow() {
     button.addEventListener("click", () => selectStylePackage(button.dataset.styleOption));
   });
 
+  if (effectBriefLabel) {
+    effectBriefLabel.dataset.defaultLabel = effectBriefLabel.textContent.trim();
+  }
+  effectBriefInput?.addEventListener("change", () => handleEffectBriefUpload(effectBriefInput.files));
+  effectBriefViewAction?.addEventListener("click", openEffectBriefViewer);
+  effectBriefEditButton?.addEventListener("click", toggleEffectBriefEditing);
+  effectBriefReuploadButton?.addEventListener("click", () => effectBriefInput?.click());
+  effectBriefCloseButton?.addEventListener("click", closeEffectBriefViewer);
+  effectBriefViewer?.addEventListener("click", (event) => {
+    if (event.target === effectBriefViewer) {
+      closeEffectBriefViewer();
+    }
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !effectBriefViewer?.hidden) {
+      closeEffectBriefViewer();
+    }
+  });
+
   generateButton?.addEventListener("click", handleGeneratePlan);
   renderFinalButton?.addEventListener("click", handleRenderFinalVersion);
   clearAdjustmentsButton?.addEventListener("click", clearCurrentAdjustments);
@@ -440,6 +501,16 @@ function selectStylePackage(styleId) {
 
 async function handleGeneratePlan() {
   if (!importState.floor || !importState.style || isGeneratingPlan) {
+    return;
+  }
+  const effectBriefParseErrors = getEffectBriefParseErrors();
+  if (effectBriefParseErrors.length > 0) {
+    setGenerationStatus({
+      status: "error",
+      title: "效果说明解析失败",
+      messages: effectBriefParseErrors,
+    });
+    updateGenerateState();
     return;
   }
 
@@ -465,7 +536,9 @@ async function handleGeneratePlan() {
 
   try {
     const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage);
-    const sample = buildGeneratedSampleFromDraft(draft, stylePackage, floorFile);
+    validateDraftAgainstEffectBrief(draft);
+    const generatedStylePackage = stylePackages[draft?.design_plan?.style] || stylePackage;
+    const sample = buildGeneratedSampleFromDraft(draft, generatedStylePackage, floorFile);
     availableSamples = [
       sample,
       ...availableSamples.filter((item) => item.id !== sample.id),
@@ -503,9 +576,11 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
   }
 
   const formData = new FormData();
+  const effectiveStyleId = effectBriefDocument?.parsed?.styleId || styleId;
+  const effectiveStylePackage = stylePackages[effectiveStyleId] || stylePackage;
   formData.append("file", file);
-  formData.append("style", styleId);
-  formData.append("brief_text", buildDesignBriefText(file, stylePackage));
+  formData.append("style", effectiveStyleId);
+  formData.append("brief_text", buildDesignBriefText(file, effectiveStylePackage));
 
   const response = await fetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, {
     method: "POST",
@@ -551,15 +626,22 @@ async function renderFinalVersionWithBackend(sample) {
 function buildDesignBriefText(file, stylePackage) {
   const projectName = normalizeProjectName(file.name);
   const idea = designIdeaInput?.value.trim();
+  const effectBriefText = effectBriefDocument?.content?.trim();
+  const ideaDuplicatesBrief = effectBriefText && normalizeEffectBriefText(idea) === normalizeEffectBriefText(effectBriefText);
+  const wholeHomeBrief = ideaDuplicatesBrief
+    ? "以效果说明文档为主生成初版方案。"
+    : idea || "根据户型自动生成初版动线、材质、家具、灯光和镜头策略。";
 
   return [
     `项目名称：${projectName}`,
+    effectBriefText ? "效果说明文档：" : "",
+    effectBriefText || "",
     `设计风格：${stylePackage.label}`,
     "重点空间：",
-    `1. 整体：${idea || "根据户型自动生成初版动线、材质、家具、灯光和镜头策略。"}`,
+    `1. 整体：${wholeHomeBrief}`,
     "效果图要求：",
     "1. 生成 2D 户型图、关键空间镜头、材质策略和渲染规格。",
-  ].join("\n");
+  ].filter((line) => line !== "").join("\n");
 }
 
 function buildGeneratedSampleFromDraft(draft, stylePackage, file) {
@@ -577,7 +659,7 @@ function buildGeneratedSampleFromDraft(draft, stylePackage, file) {
     title: `${styleLabel}初版`,
     phase: "initial",
     status: "初版 · 待生成3D",
-    area: formatDraftArea(draft?.floor_plan),
+    area: formatDraftArea(draft),
     style: styleLabel,
     delivery: "初版预览",
     summary: buildDraftSummary(file.name, styleLabel, stats, idea),
@@ -625,7 +707,13 @@ function buildDraftStats(draft) {
   };
 }
 
-function formatDraftArea(floorPlan) {
+function formatDraftArea(draftOrFloorPlan) {
+  const briefArea = formatBriefArea(draftOrFloorPlan?.design_brief?.area);
+  if (briefArea) {
+    return briefArea;
+  }
+
+  const floorPlan = draftOrFloorPlan?.floor_plan || draftOrFloorPlan;
   const roomArea = (floorPlan?.room_boundaries || []).reduce((sum, room) => {
     const area = Number(room.area);
     return Number.isFinite(area) && area > 0 ? sum + area : sum;
@@ -636,6 +724,21 @@ function formatDraftArea(floorPlan) {
   }
 
   return "待识别";
+}
+
+function formatBriefArea(area) {
+  const text = String(area || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const match = text.match(/(\d+(?:\.\d+)?)/);
+  if (!match) {
+    return text;
+  }
+
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? `${formatSquareMeters(value)} m²` : text;
 }
 
 function formatSquareMeters(value) {
@@ -760,6 +863,8 @@ function addSceneAdjustment(action) {
     label: adjustmentLabels[action],
     sceneId: scene?.id || "",
     sceneName: scene?.name || "当前场景",
+    targetRoomId: scene?.target_room_id || "",
+    promptDelta: adjustmentPromptDeltas[action] || "",
     style: sample.style,
     createdAt: new Date().toLocaleString("zh-CN", { hour12: false }),
   };
@@ -995,7 +1100,497 @@ function updateUploadLabel(input, files = input.files) {
     return;
   }
 
+  if (input.dataset.importStep === "floor") {
+    label.textContent = "重新上传图纸";
+    return;
+  }
+
   label.textContent = files.length === 1 ? files[0].name : `已选择 ${files.length} 个文件`;
+}
+
+async function handleEffectBriefUpload(files = effectBriefInput?.files) {
+  const file = files?.[0];
+  if (!file) {
+    return;
+  }
+
+  setEffectBriefUploadLabel("读取中");
+  try {
+    const formatError = validateEffectBriefFileFormat(file);
+    if (formatError) {
+      throw new Error(formatError);
+    }
+
+    const result = await extractEffectBriefContent(file);
+    const content = normalizeEffectBriefText(result.content);
+    if (!content) {
+      throw new Error("说明文档没有可读取内容，请检查文件后重新上传。");
+    }
+
+    const parsed = parseEffectBriefDocument(content, result.design_brief);
+    effectBriefDocument = {
+      fileName: file.name,
+      fileSize: file.size,
+      content,
+      backendDesignBrief: result.design_brief || null,
+      parsed,
+      messages: result.messages || [],
+      uploadedAt: new Date(),
+    };
+    applyEffectBriefToInputs(content);
+    isEditingEffectBrief = false;
+    renderEffectBriefStrip();
+    renderEffectBriefViewer();
+    reportEffectBriefParseState();
+  } catch (error) {
+    setGenerationStatus({
+      status: "error",
+      title: "效果说明读取失败",
+      messages: [formatEffectBriefError(error)],
+    });
+  } finally {
+    if (effectBriefInput) {
+      effectBriefInput.value = "";
+    }
+    setEffectBriefUploadLabel(effectBriefDocument ? "重传" : "上传效果说明");
+  }
+}
+
+function validateEffectBriefFileFormat(file) {
+  if (file.size === 0) {
+    return "说明文档为空，请重新上传。";
+  }
+
+  const extension = getFileExtension(file.name);
+  if (acceptedEffectBriefExtensions.includes(extension)) {
+    return "";
+  }
+
+  return "仅支持 TXT / MD / DOCX 效果说明文档。";
+}
+
+async function extractEffectBriefContent(file) {
+  const apiBaseUrl = getApiBaseUrl();
+  if (apiBaseUrl) {
+    try {
+      return await extractEffectBriefWithApi(file, apiBaseUrl);
+    } catch (error) {
+      if (!isTextEffectBriefFile(file)) {
+        throw error;
+      }
+    }
+  }
+
+  if (!isTextEffectBriefFile(file)) {
+    throw new Error("当前仅支持 TXT / MD / DOCX 效果说明文档。");
+  }
+
+  return { content: await file.text(), messages: [] };
+}
+
+async function extractEffectBriefWithApi(file, apiBaseUrl) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/import/effect-brief/extract`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return response.json();
+}
+
+function isTextEffectBriefFile(file) {
+  const extension = getFileExtension(file?.name || "");
+  return file?.type?.startsWith("text/") || [".txt", ".md", ".markdown"].includes(extension);
+}
+
+function renderEffectBriefStrip() {
+  if (!effectBriefSummary) {
+    return;
+  }
+
+  effectBriefSummary.closest(".upload-panel")?.classList.toggle("has-effect-brief", Boolean(effectBriefDocument));
+  effectBriefSummary.replaceChildren();
+  effectBriefSummary.hidden = !effectBriefDocument;
+  if (effectBriefViewAction) {
+    effectBriefViewAction.hidden = !effectBriefDocument;
+  }
+  if (!effectBriefDocument) {
+    return;
+  }
+
+  const label = document.createElement("span");
+  label.className = "effect-brief-strip-label";
+  label.textContent = "效果说明";
+
+  const title = document.createElement("strong");
+  title.textContent = effectBriefDocument.fileName;
+
+  const preview = document.createElement("small");
+  preview.textContent = getEffectBriefPreview(effectBriefDocument.content);
+
+  effectBriefSummary.append(label, title, preview);
+}
+
+function openEffectBriefViewer() {
+  if (!effectBriefDocument || !effectBriefViewer) {
+    return;
+  }
+
+  isEditingEffectBrief = true;
+  renderEffectBriefViewer();
+  effectBriefViewer.hidden = false;
+  effectBriefEditor?.focus();
+}
+
+function closeEffectBriefViewer() {
+  if (!effectBriefViewer) {
+    return;
+  }
+
+  isEditingEffectBrief = false;
+  effectBriefViewer.hidden = true;
+  renderEffectBriefViewer();
+}
+
+function toggleEffectBriefEditing() {
+  if (!effectBriefDocument) {
+    return;
+  }
+
+  if (isEditingEffectBrief) {
+    const content = normalizeEffectBriefText(effectBriefEditor?.value || "");
+    const parsed = parseEffectBriefDocument(content);
+    effectBriefDocument = {
+      ...effectBriefDocument,
+      content,
+      backendDesignBrief: null,
+      parsed,
+      editedAt: new Date(),
+    };
+    applyEffectBriefToInputs(content);
+    isEditingEffectBrief = false;
+    renderEffectBriefStrip();
+    renderEffectBriefViewer();
+    reportEffectBriefParseState();
+    return;
+  }
+
+  isEditingEffectBrief = true;
+  renderEffectBriefViewer();
+  effectBriefEditor?.focus();
+}
+
+function renderEffectBriefViewer() {
+  if (!effectBriefViewer || !effectBriefDocument) {
+    return;
+  }
+
+  if (effectBriefTitle) {
+    effectBriefTitle.textContent = effectBriefDocument.fileName;
+  }
+  if (effectBriefMeta) {
+    const date = effectBriefDocument.editedAt || effectBriefDocument.uploadedAt;
+    effectBriefMeta.textContent = `${formatFileSize(effectBriefDocument.fileSize)} · ${date.toLocaleString("zh-CN", { hour12: false })}`;
+  }
+  if (effectBriefContent) {
+    effectBriefContent.textContent = effectBriefDocument.content;
+    effectBriefContent.hidden = isEditingEffectBrief;
+  }
+  if (effectBriefEditor) {
+    effectBriefEditor.value = effectBriefDocument.content;
+    effectBriefEditor.hidden = !isEditingEffectBrief;
+  }
+  if (effectBriefEditButton) {
+    effectBriefEditButton.textContent = isEditingEffectBrief ? "保存" : "编辑";
+  }
+}
+
+function setEffectBriefUploadLabel(text) {
+  if (effectBriefLabel) {
+    effectBriefLabel.textContent = text || effectBriefLabel.dataset.defaultLabel || "上传效果说明";
+  }
+}
+
+function normalizeEffectBriefText(content) {
+  return String(content || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+}
+
+function parseEffectBriefDocument(content, backendDesignBrief = null) {
+  const normalizedContent = normalizeEffectBriefText(content);
+  const styleMatch = normalizedContent.match(/(?:设计风格|装修风格|风格)\s*[:：]\s*([^\n，,。；;]+)/);
+  const styleText = styleMatch?.[1]?.trim() || "";
+  const styleId = findStyleIdInText(styleText) || findStyleIdInText(normalizedContent);
+  const areaText = extractEffectBriefAreaText(normalizedContent);
+  const areaM2 = parseEffectBriefArea(areaText);
+  const floorHeightText = extractEffectBriefFloorHeightText(normalizedContent);
+  const floorHeight = parseEffectBriefHeight(floorHeightText);
+  const errors = [];
+
+  if (styleText && !styleId) {
+    errors.push(`效果说明中的风格“${styleText}”未匹配到当前可选风格。`);
+  }
+  if (areaText && !areaM2) {
+    errors.push(`效果说明中的户型面积“${areaText}”无法解析。`);
+  }
+  if (floorHeightText && !floorHeight) {
+    errors.push(`效果说明中的层高“${floorHeightText}”无法解析。`);
+  }
+
+  errors.push(...compareEffectBriefParserResults({ styleId, areaM2, floorHeight }, backendDesignBrief));
+
+  return {
+    styleText,
+    styleId,
+    areaText,
+    areaM2,
+    floorHeightText,
+    floorHeight,
+    errors,
+  };
+}
+
+function extractEffectBriefAreaText(content) {
+  const match = content.match(/(?:户型面积|建筑面积|套内面积)\s*[:：]\s*(\d+(?:\.\d+)?\s*(?:m²|㎡|m2|平米|平方米)?)/i);
+  return match?.[1]?.replace(/\s+/g, "") || "";
+}
+
+function parseEffectBriefArea(value) {
+  const match = String(value || "").match(/(\d+(?:\.\d+)?)/);
+  if (!match) {
+    return null;
+  }
+
+  const area = Number(match[1]);
+  return Number.isFinite(area) && area > 0 ? area : null;
+}
+
+function extractEffectBriefFloorHeightText(content) {
+  const match = content.match(/层高\s*[:：]\s*(\d+(?:\.\d+)?\s*(?:mm|毫米|cm|厘米|m|米)?)/i);
+  return match?.[1]?.replace(/\s+/g, "") || "";
+}
+
+function parseEffectBriefHeight(value) {
+  const match = String(value || "").match(/(\d+(?:\.\d+)?)/);
+  if (!match) {
+    return null;
+  }
+
+  const height = Number(match[1]);
+  const normalized = String(value || "").toLowerCase().replace(/\s+/g, "");
+  if (!Number.isFinite(height) || height <= 0) {
+    return null;
+  }
+  if (normalized.includes("cm") || normalized.includes("厘米")) {
+    return height * 10;
+  }
+  if (normalized.includes("mm") || normalized.includes("毫米")) {
+    return height >= 100 && height < 1000 ? height * 10 : height;
+  }
+  if ((normalized.includes("m") || normalized.includes("米")) && !normalized.includes("m²")) {
+    return height * 1000;
+  }
+  if (height < 10) {
+    return height * 1000;
+  }
+  if (height >= 100 && height < 1000) {
+    return height * 10;
+  }
+  return height;
+}
+
+function compareEffectBriefParserResults(parsed, backendDesignBrief) {
+  if (!backendDesignBrief) {
+    return [];
+  }
+
+  const errors = [];
+  if (parsed.styleId) {
+    const backendStyleId = findStyleIdInText(backendDesignBrief.design_style);
+    if (!backendStyleId) {
+      errors.push("后端未能解析出效果说明中的设计风格。");
+    } else if (backendStyleId !== parsed.styleId) {
+      errors.push(`前后端风格解析不一致：前端为 ${stylePackages[parsed.styleId]?.label || parsed.styleId}，后端为 ${backendDesignBrief.design_style}。`);
+    }
+  }
+
+  if (parsed.areaM2) {
+    const backendArea = parseEffectBriefArea(backendDesignBrief.area);
+    if (!backendArea) {
+      errors.push("后端未能解析出效果说明中的户型面积。");
+    } else if (!isCloseNumber(backendArea, parsed.areaM2, 0.05)) {
+      errors.push(`前后端户型面积解析不一致：前端为 ${parsed.areaM2}㎡，后端为 ${backendArea}㎡。`);
+    }
+  }
+
+  if (parsed.floorHeight) {
+    const backendHeight = Number(backendDesignBrief.floor_height);
+    if (!Number.isFinite(backendHeight)) {
+      errors.push("后端未能解析出效果说明中的层高。");
+    } else if (!isCloseNumber(backendHeight, parsed.floorHeight, 1)) {
+      errors.push(`前后端层高解析不一致：前端为 ${formatMillimeters(parsed.floorHeight)}，后端为 ${formatMillimeters(backendHeight)}。`);
+    }
+  }
+
+  return errors;
+}
+
+function reportEffectBriefParseState() {
+  const errors = getEffectBriefParseErrors();
+  if (errors.length > 0) {
+    setGenerationStatus({
+      status: "error",
+      title: "效果说明解析失败",
+      messages: errors,
+    });
+  } else {
+    clearGenerationStatus();
+  }
+  updateGenerateState();
+}
+
+function getEffectBriefParseErrors() {
+  return effectBriefDocument?.parsed?.errors || [];
+}
+
+function applyEffectBriefToInputs(content) {
+  const normalizedContent = normalizeEffectBriefText(content);
+  if (designIdeaInput) {
+    designIdeaInput.value = normalizedContent;
+  }
+
+  const detectedStyleId = effectBriefDocument?.parsed?.styleId || detectStyleFromEffectBrief(normalizedContent);
+  if (detectedStyleId) {
+    selectStylePackage(detectedStyleId);
+    return;
+  }
+
+  if (effectBriefDocument?.parsed?.styleText) {
+    clearSelectedStylePackage();
+    return;
+  }
+
+  clearGenerationStatus();
+  updateGenerateState();
+}
+
+function clearSelectedStylePackage() {
+  selectedStyleId = "";
+  importState.style = false;
+  styleOptionButtons.forEach((button) => {
+    button.classList.remove("is-selected");
+    button.setAttribute("aria-pressed", "false");
+  });
+  updateGenerateState();
+}
+
+function detectStyleFromEffectBrief(content) {
+  const explicitStyle = content.match(/(?:设计风格|装修风格|风格)\s*[:：]\s*([^\n，,。；;]+)/);
+  return findStyleIdInText(explicitStyle?.[1]) || findStyleIdInText(content);
+}
+
+function findStyleIdInText(text) {
+  const haystack = String(text || "").toLowerCase();
+  if (!haystack) {
+    return "";
+  }
+
+  const matches = Object.entries(effectBriefStyleAliases)
+    .flatMap(([styleId, aliases]) =>
+      aliases.map((alias) => ({
+        styleId,
+        index: haystack.indexOf(alias.toLowerCase()),
+        weight: alias.length,
+      }))
+    )
+    .filter((match) => match.index >= 0)
+    .sort((left, right) => left.index - right.index || right.weight - left.weight);
+
+  return matches[0]?.styleId || "";
+}
+
+function getEffectBriefPreview(content) {
+  const firstLine = normalizeEffectBriefText(content)
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!firstLine) {
+    return "点击查看完整说明";
+  }
+  return firstLine.length > 52 ? `${firstLine.slice(0, 52)}...` : firstLine;
+}
+
+function formatEffectBriefError(error) {
+  const message = error instanceof Error ? error.message : "";
+  return message || "无法读取效果说明文档，请重新上传 TXT / MD / DOCX 文件。";
+}
+
+function formatFileSize(size) {
+  const bytes = Number(size) || 0;
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${Math.ceil(bytes / 1024)} KB`;
+  }
+  return `${bytes} B`;
+}
+
+function validateDraftAgainstEffectBrief(draft) {
+  const parsed = effectBriefDocument?.parsed;
+  if (!parsed) {
+    return;
+  }
+
+  const errors = [];
+  const designBrief = draft?.design_brief || {};
+  if (parsed.styleId) {
+    const generatedStyleId = String(draft?.design_plan?.style || "").toLowerCase();
+    if (generatedStyleId !== parsed.styleId) {
+      errors.push(`风格应为 ${stylePackages[parsed.styleId]?.label || parsed.styleId}，实际生成 ${draft?.design_plan?.style_label || generatedStyleId || "未识别"}。`);
+    }
+  }
+
+  if (parsed.areaM2) {
+    const parsedArea = parseEffectBriefArea(designBrief.area);
+    if (!parsedArea) {
+      errors.push("后端生成结果缺少效果说明中的户型面积。");
+    } else if (!isCloseNumber(parsedArea, parsed.areaM2, 0.05)) {
+      errors.push(`户型面积应为 ${parsed.areaM2}㎡，实际解析 ${parsedArea}㎡。`);
+    }
+  }
+
+  if (parsed.floorHeight) {
+    const briefHeight = Number(designBrief.floor_height);
+    const floorPlanHeight = Number(draft?.floor_plan?.floor_height);
+    const renderHeight = Number(draft?.render_spec?.floor_height);
+    if (!Number.isFinite(briefHeight) || !isCloseNumber(briefHeight, parsed.floorHeight, 1)) {
+      errors.push(`说明层高应为 ${formatMillimeters(parsed.floorHeight)}，后端说明解析为 ${Number.isFinite(briefHeight) ? formatMillimeters(briefHeight) : "未识别"}。`);
+    }
+    if (!Number.isFinite(floorPlanHeight) || !isCloseNumber(floorPlanHeight, parsed.floorHeight, 1)) {
+      errors.push(`户型模型层高应为 ${formatMillimeters(parsed.floorHeight)}，实际为 ${Number.isFinite(floorPlanHeight) ? formatMillimeters(floorPlanHeight) : "未识别"}。`);
+    }
+    if (!Number.isFinite(renderHeight) || !isCloseNumber(renderHeight, parsed.floorHeight, 1)) {
+      errors.push(`渲染规格层高应为 ${formatMillimeters(parsed.floorHeight)}，实际为 ${Number.isFinite(renderHeight) ? formatMillimeters(renderHeight) : "未识别"}。`);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`效果说明解析结果不一致：${errors.join("；")}`);
+  }
+}
+
+function isCloseNumber(left, right, tolerance) {
+  return Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= tolerance;
+}
+
+function formatMillimeters(value) {
+  return `${Math.round(Number(value))}mm`;
 }
 
 async function validateFloorFile(input, files = input.files) {
@@ -1540,6 +2135,7 @@ function renderFloorValidation() {
   });
 
   floorValidationPanel.append(list);
+  syncPostUploadRegionWidth();
 }
 
 function clearFloorPreview() {
@@ -1547,7 +2143,9 @@ function clearFloorPreview() {
     return;
   }
   floorPreviewPanel.replaceChildren();
-  floorPreviewPanel.closest(".upload-panel")?.classList.remove("has-floor-preview");
+  const uploadPanel = floorPreviewPanel.closest(".upload-panel");
+  uploadPanel?.classList.remove("has-floor-preview");
+  uploadPanel?.style.removeProperty("--post-upload-region-width");
 }
 
 function setFloorPreviewMessage(title, messages = []) {
@@ -1666,6 +2264,21 @@ function renderFloorPreview(drawing, fileName) {
   });
 
   floorPreviewPanel.append(title, summary, svg);
+  syncPostUploadRegionWidth();
+}
+
+function syncPostUploadRegionWidth() {
+  const uploadPanel = floorPreviewPanel?.closest(".upload-panel");
+  if (!uploadPanel?.classList.contains("has-floor-preview") || !floorValidationPanel) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    const validationWidth = Math.round(floorValidationPanel.getBoundingClientRect().width);
+    if (validationWidth > 0) {
+      uploadPanel.style.setProperty("--post-upload-region-width", `${validationWidth}px`);
+    }
+  });
 }
 
 function createSvgElement(tagName, attributes = {}) {
@@ -2021,6 +2634,7 @@ function normalizeDxfLayer(layer) {
 function updateGenerateState() {
   const completedCount = importSteps.filter((step) => importState[step]).length;
   const isReady = completedCount === importSteps.length;
+  const hasEffectBriefParseErrors = getEffectBriefParseErrors().length > 0;
 
   document.querySelectorAll("[data-step-card]").forEach((card) => {
     const isFloorCard = card.dataset.stepCard === "floor";
@@ -2030,7 +2644,7 @@ function updateGenerateState() {
   });
 
   if (generateButton) {
-    const isDisabled = !isReady || isGeneratingPlan;
+    const isDisabled = !isReady || isGeneratingPlan || hasEffectBriefParseErrors;
     generateButton.disabled = isDisabled;
     generateButton.setAttribute("aria-disabled", String(isDisabled));
   }
