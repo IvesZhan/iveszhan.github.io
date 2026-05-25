@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f4ec">
+  <title>禅·见 | 群主后台</title>
+  <link rel="icon" href="../assets/images/brand/favicon.png">
+  <link rel="stylesheet" href="./web.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="群主后台导航">
+      <a class="brand" href="../">
+        <img src="../assets/images/brand/meditation-icon.png" alt="" width="36" height="36">
+        <span>禅·见</span>
+      </a>
+
+      <div class="owner-gate">
+        <span class="eyebrow">群主工作台</span>
+        <p>按日期巡查打卡、请假、缺勤和入群申请。</p>
+      </div>
+
+      <label class="field-label" for="group-select">管理群组</label>
+      <select id="group-select" class="select-control" disabled>
+        <option>登录后加载</option>
+      </select>
+
+      <nav id="side-nav" class="side-nav" aria-label="看板区域" hidden>
+        <a href="#overview">区间总览</a>
+        <a href="#calendar">每日汇总</a>
+        <a href="#day-detail">单日汇总</a>
+        <a href="#members">成员分层</a>
+        <a href="#requests">入群申请</a>
+        <a href="#rules">群规则</a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <section id="auth-panel" class="auth-panel" aria-labelledby="auth-title">
+        <div>
+          <span class="eyebrow">Owner Access</span>
+          <h1 id="auth-title">群主登录</h1>
+          <p>使用 ZenSee 账号登录。后台数据接口会再次校验你是否为当前群组的群主。</p>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <label>
+            <span>邮箱</span>
+            <input id="email-input" type="email" autocomplete="email" required>
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="password-input" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="primary-button" type="submit">登录后台</button>
+          <p id="auth-message" class="form-message" role="status"></p>
+        </form>
+      </section>
+
+      <section id="dashboard-panel" class="dashboard-panel" hidden>
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Owner Dashboard</span>
+            <h1 id="group-title">群主后台</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh-button" class="ghost-button" type="button">刷新</button>
+            <div class="profile-menu">
+              <button id="profile-button" class="profile-button" type="button" aria-haspopup="true" aria-expanded="false">
+                <span id="profile-avatar" class="profile-avatar">禅</span>
+              </button>
+              <div id="profile-popover" class="profile-popover" hidden>
+                <div class="profile-head">
+                  <span id="profile-popover-avatar" class="profile-avatar large">禅</span>
+                  <div>
+                    <strong id="profile-display-name">禅友</strong>
+                    <span id="profile-email">已登录</span>
+                  </div>
+                </div>
+                <form id="profile-form" class="profile-form">
+                  <label>
+                    <span>昵称</span>
+                    <input id="profile-nickname-input" type="text" maxlength="24">
+                  </label>
+                  <label>
+                    <span>头像 URL</span>
+                    <input id="profile-avatar-input" type="url" placeholder="https://">
+                  </label>
+                  <div class="profile-actions">
+                    <button class="secondary-button" type="submit">保存资料</button>
+                    <button id="sign-out-button" class="ghost-button" type="button">退出登录</button>
+                  </div>
+                  <p id="profile-message" class="form-message" role="status"></p>
+                </form>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="filter-strip" aria-label="日期筛选">
+          <div class="quick-ranges" role="group" aria-label="快捷日期">
+            <button data-range="today" type="button">今天</button>
+            <button data-range="yesterday" type="button">昨天</button>
+            <button data-range="7" type="button" class="is-active">近 7 天</button>
+            <button data-range="30" type="button">近 30 天</button>
+            <button data-range="month" type="button">本月</button>
+          </div>
+          <label>
+            <span>开始</span>
+            <input id="start-date" type="date">
+          </label>
+          <label>
+            <span>结束</span>
+            <input id="end-date" type="date">
+          </label>
+          <label>
+            <span>查看某天</span>
+            <input id="selected-date" type="date">
+          </label>
+          <button id="apply-date-button" class="secondary-button" type="button">应用</button>
+        </section>
+
+        <p id="dashboard-message" class="status-message" role="status"></p>
+
+        <section id="overview" class="section-band">
+          <div class="section-heading">
+            <span class="eyebrow">Overview</span>
+            <h2>区间总览</h2>
+          </div>
+          <div id="metric-grid" class="metric-grid"></div>
+          <div class="overview-split">
+            <div class="trend-panel">
+              <h3>打卡率趋势</h3>
+              <div id="trend-chart" class="trend-chart"></div>
+            </div>
+            <div class="risk-panel">
+              <h3>需要关注</h3>
+              <div id="risk-list" class="risk-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="calendar" class="section-band">
+          <div class="section-heading">
+            <span class="eyebrow">Calendar</span>
+            <h2>每日汇总</h2>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </section>
+
+        <section id="day-detail" class="section-band">
+          <div class="section-heading inline-heading">
+            <div>
+              <span class="eyebrow">Daily Detail</span>
+              <h2 id="day-title">单日汇总</h2>
+            </div>
+            <div class="inline-actions">
+              <button id="copy-remind-button" class="ghost-button" type="button">复制提醒名单</button>
+              <button id="export-day-button" class="ghost-button" type="button">导出 CSV</button>
+            </div>
+          </div>
+          <div id="day-summary-grid" class="metric-grid compact"></div>
+          <div class="member-toolbar">
+            <label>
+              <span>状态</span>
+              <select id="status-filter" class="select-control">
+                <option value="all">全部</option>
+                <option value="checked_in">已打卡</option>
+                <option value="on_leave">已请假</option>
+                <option value="missed">未打卡</option>
+              </select>
+            </label>
+            <label>
+              <span>搜索成员</span>
+              <input id="member-search" type="search" placeholder="昵称">
+            </label>
+            <label>
+              <span>排序</span>
+              <select id="member-sort" class="select-control">
+                <option value="status">按状态</option>
+                <option value="minutes">按当日分钟</option>
+                <option value="missed">按连续缺勤</option>
+                <option value="joined">按入群时间</option>
+              </select>
+            </label>
+          </div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>成员</th>
+                  <th>当日状态</th>
+                  <th>当日分钟</th>
+                  <th>区间活跃</th>
+                  <th>连续缺勤</th>
+                  <th>最后分享</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="member-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="members" class="section-band">
+          <div class="section-heading">
+            <span class="eyebrow">Members</span>
+            <h2>成员分层</h2>
+          </div>
+          <div id="segment-grid" class="segment-grid"></div>
+        </section>
+
+        <section id="requests" class="section-band">
+          <div class="section-heading">
+            <span class="eyebrow">Requests</span>
+            <h2>入群申请</h2>
+          </div>
+          <div id="request-list" class="request-list"></div>
+        </section>
+
+        <section id="rules" class="section-band">
+          <div class="section-heading">
+            <span class="eyebrow">Rules</span>
+            <h2>群规则</h2>
+          </div>
+          <div class="rules-grid">
+            <form id="group-settings-form" class="settings-form">
+              <label>
+                <span>群名称</span>
+                <input id="group-name-input" type="text" maxlength="24">
+              </label>
+              <label>
+                <span>群描述</span>
+                <textarea id="group-description-input" maxlength="120" rows="4"></textarea>
+              </label>
+              <label>
+                <span>自动移除</span>
+                <select id="auto-kick-select" class="select-control">
+                  <option value="0">关闭</option>
+                  <option value="3">3 天未打卡</option>
+                  <option value="5">5 天未打卡</option>
+                  <option value="7">7 天未打卡</option>
+                </select>
+              </label>
+              <button class="secondary-button" type="submit">保存规则</button>
+            </form>
+            <div class="impact-panel">
+              <h3>规则影响预览</h3>
+              <p id="rule-impact-copy">选择群组后显示将受自动移除规则影响的成员。</p>
+              <div id="rule-impact-list" class="impact-list"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
