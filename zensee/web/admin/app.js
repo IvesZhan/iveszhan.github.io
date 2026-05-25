@@ -29,6 +29,7 @@
     sideNav: document.getElementById("side-nav"),
     groupSelect: document.getElementById("group-select"),
     groupTitle: document.getElementById("group-title"),
+    groupIdRow: document.getElementById("group-id-row"),
     groupIdLine: document.getElementById("group-id-line"),
     copyGroupIdButton: document.getElementById("copy-group-id-button"),
     signOutButton: document.getElementById("sign-out-button"),
@@ -377,7 +378,7 @@
 
     var group = state.snapshot.group;
     elements.groupTitle.textContent = group.name;
-    elements.groupIdLine.textContent = "group_id: " + group.id;
+    renderGroupId(group.id);
     elements.groupNameInput.value = group.name || "";
     elements.groupDescriptionInput.value = group.description || "";
     elements.autoKickSelect.value = String(group.auto_kick_days || 0);
@@ -919,6 +920,7 @@
   }
 
   function clearDashboard() {
+    renderGroupId("");
     elements.metricGrid.innerHTML = "";
     elements.trendChart.innerHTML = "";
     elements.riskList.innerHTML = "";
@@ -928,6 +930,12 @@
     elements.segmentGrid.innerHTML = "";
     elements.requestList.innerHTML = "";
     elements.ruleImpactList.innerHTML = "";
+  }
+
+  function renderGroupId(groupId) {
+    var value = String(groupId || "");
+    elements.groupIdLine.textContent = value ? "group_id: " + value : "";
+    elements.groupIdRow.hidden = !value;
   }
 
   function activeMembers() {

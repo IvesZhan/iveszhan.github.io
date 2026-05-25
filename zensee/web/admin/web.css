@@ -442,25 +442,36 @@ textarea:focus {
 
 .group-id-line {
   margin: var(--space-2) 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 800;
+  line-height: 1.25;
+}
+
+.group-id-line[hidden] {
+  display: none;
+}
+
+.group-id-line span {
+  min-width: 0;
   word-break: break-all;
 }
 
 .copy-icon-button {
-  width: 26px;
-  height: 26px;
-  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  flex: 0 0 24px;
   place-items: center;
-  margin-left: 6px;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
   padding: 0;
   line-height: 1;
-  vertical-align: middle;
 }
 
 .copy-icon-button:hover,
@@ -471,30 +482,31 @@ textarea:focus {
 
 .copy-icon {
   position: relative;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
 .copy-icon::before,
 .copy-icon::after {
+  box-sizing: border-box;
   content: "";
   position: absolute;
-  width: 9px;
-  height: 10px;
-  border: 1.6px solid currentColor;
+  width: 11px;
+  height: 12px;
+  border: 1.7px solid currentColor;
   border-radius: 2px;
 }
 
 .copy-icon::before {
   left: 1px;
-  top: 3px;
+  top: 4px;
   opacity: 0.58;
 }
 
 .copy-icon::after {
   left: 5px;
-  top: 0;
+  top: 1px;
   background: rgba(255, 252, 246, 0.96);
 }
 
@@ -511,6 +523,10 @@ textarea:focus {
   border-radius: 0;
   background: transparent;
   transform: rotate(-45deg);
+}
+
+.group-id-line .copy-icon-button {
+  transform: translateY(-1px);
 }
 
 .topbar-actions,
