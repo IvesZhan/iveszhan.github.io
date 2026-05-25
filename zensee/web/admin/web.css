@@ -440,6 +440,79 @@ textarea:focus {
   line-height: 1.04;
 }
 
+.group-id-line {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  word-break: break-all;
+}
+
+.copy-icon-button {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.copy-icon-button:hover,
+.copy-icon-button:focus-visible {
+  background: rgba(85, 114, 104, 0.11);
+  color: var(--ink);
+}
+
+.copy-icon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.copy-icon::before,
+.copy-icon::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 10px;
+  border: 1.6px solid currentColor;
+  border-radius: 2px;
+}
+
+.copy-icon::before {
+  left: 1px;
+  top: 3px;
+  opacity: 0.58;
+}
+
+.copy-icon::after {
+  left: 5px;
+  top: 0;
+  background: rgba(255, 252, 246, 0.96);
+}
+
+.copy-icon-button.is-copied .copy-icon::before {
+  display: none;
+}
+
+.copy-icon-button.is-copied .copy-icon::after {
+  left: 2px;
+  top: 1px;
+  width: 12px;
+  height: 7px;
+  border-width: 0 0 2px 2px;
+  border-radius: 0;
+  background: transparent;
+  transform: rotate(-45deg);
+}
+
 .topbar-actions,
 .inline-actions {
   display: flex;
@@ -537,7 +610,46 @@ textarea:focus {
 
 .profile-form {
   display: grid;
-  gap: var(--space-3);
+  gap: 8px;
+}
+
+.token-field {
+  display: grid;
+  gap: 6px;
+}
+
+.token-field span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.token-row .copy-icon-button {
+  margin-left: 0;
+}
+
+.token-field code {
+  overflow: hidden;
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(57, 45, 32, 0.05);
+  color: var(--ink-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .profile-actions {
@@ -545,6 +657,15 @@ textarea:focus {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
+}
+
+#profile-message:empty {
+  display: none;
+}
+
+#profile-message {
+  min-height: 0;
+  margin: 0;
 }
 
 .filter-strip {

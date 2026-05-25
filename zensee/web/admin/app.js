@@ -29,7 +29,8 @@
     sideNav: document.getElementById("side-nav"),
     groupSelect: document.getElementById("group-select"),
     groupTitle: document.getElementById("group-title"),
-    refreshButton: document.getElementById("refresh-button"),
+    groupIdLine: document.getElementById("group-id-line"),
+    copyGroupIdButton: document.getElementById("copy-group-id-button"),
     signOutButton: document.getElementById("sign-out-button"),
     profileButton: document.getElementById("profile-button"),
     profileAvatar: document.getElementById("profile-avatar"),
@@ -40,6 +41,8 @@
     profileForm: document.getElementById("profile-form"),
     profileNicknameInput: document.getElementById("profile-nickname-input"),
     profileAvatarInput: document.getElementById("profile-avatar-input"),
+    profileToken: document.getElementById("profile-token"),
+    copyTokenButton: document.getElementById("copy-token-button"),
     profileMessage: document.getElementById("profile-message"),
     startDate: document.getElementById("start-date"),
     endDate: document.getElementById("end-date"),
@@ -96,9 +99,6 @@
     });
 
     elements.signOutButton.addEventListener("click", signOut);
-    elements.refreshButton.addEventListener("click", function () {
-      loadSnapshot();
-    });
     elements.profileButton.addEventListener("click", function (event) {
       event.stopPropagation();
       toggleProfilePopover();
@@ -110,6 +110,8 @@
       event.preventDefault();
       saveProfile();
     });
+    elements.copyTokenButton.addEventListener("click", copyAccessToken);
+    elements.copyGroupIdButton.addEventListener("click", copyGroupId);
     document.addEventListener("click", closeProfilePopover);
     window.addEventListener("scroll", updateActiveNav);
 
@@ -375,6 +377,7 @@
 
     var group = state.snapshot.group;
     elements.groupTitle.textContent = group.name;
+    elements.groupIdLine.textContent = "group_id: " + group.id;
     elements.groupNameInput.value = group.name || "";
     elements.groupDescriptionInput.value = group.description || "";
     elements.autoKickSelect.value = String(group.auto_kick_days || 0);
@@ -452,13 +455,49 @@
     var metadata = user.user_metadata || {};
     var nickname = profile.nickname || metadata.nickname || emailPrefix(email) || "禅友";
     var avatarUrl = profile.avatar_url || metadata.avatar_url || "";
+    var token = state.session && state.session.access_token || "";
 
     elements.profileDisplayName.textContent = nickname;
     elements.profileEmail.textContent = email || "已登录";
     elements.profileNicknameInput.value = nickname === "禅友" ? "" : nickname;
     elements.profileAvatarInput.value = avatarUrl;
+    elements.profileToken.textContent = token ? compactToken(token) : "未登录";
     renderAvatar(elements.profileAvatar, nickname, avatarUrl);
     renderAvatar(elements.profilePopoverAvatar, nickname, avatarUrl);
+  }
+
+  function copyAccessToken() {
+    var token = state.session && state.session.access_token || "";
+    if (!token) {
+      setProfileMessage("当前没有可复制的 token。");
+      return;
+    }
+
+    copyText(token).then(function () {
+      showCopiedIcon(elements.copyTokenButton);
+    }).catch(function () {
+      setProfileMessage("复制失败，请手动选中 token。");
+    });
+  }
+
+  function copyGroupId() {
+    var groupId = state.snapshot && state.snapshot.group && state.snapshot.group.id || state.groupId;
+    if (!groupId) {
+      return;
+    }
+
+    copyText(groupId).then(function () {
+      showCopiedIcon(elements.copyGroupIdButton);
+    }).catch(function () {
+      setDashboardMessage("复制失败，请手动选中 group_id。");
+    });
+  }
+
+  function showCopiedIcon(button) {
+    button.classList.add("is-copied");
+    window.setTimeout(function () {
+      button.classList.remove("is-copied");
+    }, 1100);
   }
 
   function saveProfile() {
@@ -1107,6 +1146,14 @@
 
   function emailPrefix(email) {
     return String(email || "").split("@")[0] || "";
+  }
+
+  function compactToken(token) {
+    var value = String(token || "");
+    if (value.length <= 28) {
+      return value;
+    }
+    return value.slice(0, 14) + "..." + value.slice(-10);
   }
 
   function startOfLocalDay(date) {

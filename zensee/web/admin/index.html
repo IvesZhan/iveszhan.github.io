@@ -62,9 +62,14 @@
           <div>
             <span class="eyebrow">Owner Dashboard</span>
             <h1 id="group-title">群主后台</h1>
+            <p class="group-id-line">
+              <span id="group-id-line"></span>
+              <button id="copy-group-id-button" class="copy-icon-button" type="button" aria-label="复制 group_id" title="复制 group_id">
+                <span aria-hidden="true" class="copy-icon"></span>
+              </button>
+            </p>
           </div>
           <div class="topbar-actions">
-            <button id="refresh-button" class="ghost-button" type="button">刷新</button>
             <div class="profile-menu">
               <button id="profile-button" class="profile-button" type="button" aria-haspopup="true" aria-expanded="false">
                 <span id="profile-avatar" class="profile-avatar">禅</span>
@@ -86,6 +91,15 @@
                     <span>头像 URL</span>
                     <input id="profile-avatar-input" type="url" placeholder="https://">
                   </label>
+                  <div class="token-field">
+                    <span>Access Token</span>
+                    <div class="token-row">
+                      <code id="profile-token">未登录</code>
+                      <button id="copy-token-button" class="copy-icon-button" type="button" aria-label="复制 Access Token" title="复制 Access Token">
+                        <span aria-hidden="true" class="copy-icon"></span>
+                      </button>
+                    </div>
+                  </div>
                   <div class="profile-actions">
                     <button class="secondary-button" type="submit">保存资料</button>
                     <button id="sign-out-button" class="ghost-button" type="button">退出登录</button>
