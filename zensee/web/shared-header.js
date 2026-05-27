@@ -2,7 +2,7 @@
   var defaultDownloadLinks = {
     ios: "https://apps.apple.com/app/6760809128",
     androidZhCn: "https://www.pgyer.com/zensee-android",
-    androidGlobal: "https://raw.githubusercontent.com/IvesZhan/zensee-android/main/downloads/latest/ZenSee-android-latest.apk",
+    androidGlobal: "https://iveszhan.github.io/zensee/downloads/android/latest/ZenSee-android-latest.apk",
     fallback: "https://iveszhan.github.io/zensee/web/download/"
   };
   var host = document.getElementById("shared-header");
