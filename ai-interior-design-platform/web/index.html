@@ -8,7 +8,7 @@
       name="description"
       content="交换空间设计平台，用于管理、生成和交付家装空间方案。"
     />
-    <link rel="stylesheet" href="./styles.css?v=stable-loading" />
+    <link rel="stylesheet" href="./styles.css?v=case-and-style-library" />
   </head>
   <body data-role="client">
     <header class="app-header">
@@ -20,16 +20,40 @@
         </span>
       </a>
       <nav class="app-nav" aria-label="工作台导航">
-        <button class="is-active" type="button" data-go-tab="samples">方案库</button>
+        <button class="is-active" type="button" data-go-tab="samples">案例库</button>
+        <button type="button" data-go-tab="style-library">风格库</button>
         <button type="button" data-go-tab="platform" data-designer-only>新方案</button>
-        <button type="button" data-go-tab="assets" data-designer-only>素材</button>
       </nav>
     </header>
 
     <main class="app-main">
-      <section class="view-panel is-active" id="samples" data-panel="samples" aria-label="方案工作台">
+      <section class="view-panel is-active" id="samples" data-panel="samples" aria-label="案例库">
         <div class="workspace-shell">
-          <div class="project-grid" id="sampleList" aria-label="方案列表"></div>
+          <div class="case-library-head" aria-label="案例库概览">
+            <div>
+              <p class="kicker">已有方案</p>
+              <h1>案例库</h1>
+            </div>
+          </div>
+          <div class="project-grid" id="sampleList" aria-label="案例列表"></div>
+        </div>
+      </section>
+
+      <section class="view-panel" id="styleLibrary" data-panel="style-library" aria-label="风格库">
+        <div class="workspace-shell style-library-shell">
+          <div class="case-library-head style-library-head" aria-label="风格库概览">
+            <div>
+              <h1>风格库</h1>
+            </div>
+          </div>
+          <div class="style-toolbar" aria-label="风格筛选">
+            <div class="style-filter-row" data-style-filters aria-label="风格分类筛选"></div>
+            <label class="style-search">
+              <span>搜索</span>
+              <input type="search" data-style-search placeholder="现代、奶油、中古、原木" />
+            </label>
+          </div>
+          <div class="style-gallery" id="styleList" aria-label="风格列表"></div>
         </div>
       </section>
 
@@ -42,7 +66,6 @@
           <nav class="scheme-tabs" aria-label="方案内部导航">
             <button class="is-active" type="button" data-scheme-tab="preview">预览</button>
             <button type="button" data-scheme-tab="adjust">调整</button>
-            <button type="button" data-scheme-tab="delivery" data-final-only>交付</button>
             <button type="button" data-scheme-tab="versions" data-final-only>版本</button>
           </nav>
         </div>
@@ -51,6 +74,21 @@
           <div class="detail-layout">
             <section class="live-preview" aria-label="方案预览">
               <img id="detailImage" src="./assets/living-wide.jpg" alt="方案预览" />
+              <div class="inline-vr-preview" data-inline-vr-preview hidden>
+                <div class="inline-vr-stage" data-inline-vr-stage>
+                  <canvas data-inline-vr-canvas aria-label="全屋 VR 预览"></canvas>
+                  <div class="vr-viewer-hotspots" data-inline-vr-hotspots></div>
+                </div>
+                <div class="inline-vr-toolbar">
+                  <span data-inline-vr-status>全屋 VR</span>
+                  <div>
+                    <button type="button" data-inline-vr-auto>旋转</button>
+                    <button type="button" data-inline-vr-reset>复位</button>
+                    <button type="button" data-inline-vr-fullscreen>全屏</button>
+                  </div>
+                </div>
+                <div class="vr-viewer-tabs inline-vr-tabs" data-inline-vr-tabs aria-label="全屋空间切换"></div>
+              </div>
               <div class="space-tabs" id="detailRoomTabs" aria-label="空间切换"></div>
             </section>
 
@@ -71,9 +109,10 @@
                 </div>
                 <div>
                   <dt>交付</dt>
-                  <dd id="detailDelivery">效果图 + VR</dd>
+                  <dd id="detailDelivery">VR全景方案</dd>
                 </div>
               </dl>
+              <div class="preview-floor-plan" data-preview-floor-plan aria-label="户型图"></div>
             </aside>
           </div>
         </div>
@@ -100,21 +139,22 @@
                 <div class="decision-section">
                   <div class="feedback-list" data-adjust-actions></div>
                 </div>
+
+                <label class="manual-adjustment">
+                  <span>补充说明</span>
+                  <textarea data-manual-adjustment rows="5" placeholder="例如：电视柜改成满墙收纳，减少弧形造型，地面和厨房保持一致。"></textarea>
+                </label>
               </div>
 
               <div class="adjust-panel-footer">
                 <div class="generation-status render-status" data-render-status aria-live="polite"></div>
                 <div class="decision-footer">
-                  <button class="primary-action" type="button" data-render-final>生成3D效果图</button>
+                  <button class="primary-action" type="button" data-render-final>重新生成</button>
                   <button class="ghost-action" type="button" data-clear-adjustments>清空调整</button>
                 </div>
               </div>
             </aside>
           </div>
-        </div>
-
-        <div class="scheme-pane" data-scheme-pane="delivery">
-          <div data-delivery-content></div>
         </div>
 
         <div class="scheme-pane" data-scheme-pane="versions">
@@ -144,15 +184,15 @@
                 </button>
                 <button class="style-option" type="button" data-style-option="cream" aria-pressed="false">
                   <span class="style-cover">
-                    <img src="./assets/style-covers/cream.png" alt="奶油风空间预览" loading="lazy" />
+                    <img src="./assets/style-covers/cream.png" alt="现代奶油风空间预览" loading="lazy" />
                   </span>
-                  <span><strong>奶油风</strong><small>暖白软装、圆润体块、柔和材质</small></span>
+                  <span><strong>现代奶油风</strong><small>暖白浅木、圆润家具、真实柔光</small></span>
                 </button>
                 <button class="style-option" type="button" data-style-option="modern" aria-pressed="false">
                   <span class="style-cover">
                     <img src="./assets/style-covers/modern.png" alt="现代简约空间预览" loading="lazy" />
                   </span>
-                  <span><strong>现代简约</strong><small>干净线条、浅灰材质、黑色收边</small></span>
+                  <span><strong>现代简约</strong><small>黑白灰、满墙收纳、简洁造型</small></span>
                 </button>
                 <button class="style-option" type="button" data-style-option="wood" aria-pressed="false">
                   <span class="style-cover">
@@ -170,7 +210,7 @@
             <div class="generation-footer">
               <div>
                 <strong>生成方案</strong>
-                <small>检查通过后生成效果图、全景和交付入口。</small>
+                <small>检查通过后生成空间全景和 VR 交付入口。</small>
               </div>
               <button class="primary-action generate-action" type="button" data-generate-plan disabled>
                 生成空间方案
@@ -191,7 +231,6 @@
                   <small>支持 DXF / DWG，单位 mm，1:1。</small>
                 </div>
                 <div class="floor-upload-module effect-brief-module">
-                  <strong>效果说明</strong>
                   <div class="effect-brief-controls">
                     <div class="effect-brief-summary" data-effect-brief-summary hidden></div>
                     <button class="effect-brief-view-action" type="button" data-effect-brief-view-action hidden>
@@ -216,15 +255,15 @@
         id="assets"
         data-panel="assets"
         data-designer-panel
-        aria-label="设计资产"
+        aria-label="风格库"
       >
         <div class="panel-toolbar asset-hero">
           <div>
-            <p class="kicker">设计素材</p>
-            <h1>风格与材质</h1>
-            <p>风格、材质、模型和灯光策略按方案组织，设计师只做方向确认。</p>
+            <p class="kicker">风格库</p>
+            <h1>风格参考</h1>
+            <p>真实全景作为风格参考，后续再接入户型匹配和局部修改。</p>
           </div>
-          <img src="./assets/showcase/materials-moodboard.jpg" alt="设计素材材质板" loading="lazy" />
+          <img src="./assets/showcase/materials-moodboard.jpg" alt="风格材质板" loading="lazy" />
         </div>
 
         <div class="asset-layout">
@@ -235,9 +274,9 @@
             </div>
             <div class="library-grid engine-grid">
               <article><img src="./assets/style-covers/vintage.png" alt="风格预览" loading="lazy" /><span>01</span><strong>风格</strong><p>确定空间气质。</p></article>
-              <article><img src="./assets/showcase/materials-moodboard.jpg" alt="素材预览" loading="lazy" /><span>02</span><strong>素材</strong><p>材质、模型与灯光。</p></article>
+              <article><img src="./assets/showcase/materials-moodboard.jpg" alt="材质预览" loading="lazy" /><span>02</span><strong>材质</strong><p>色彩和质感。</p></article>
               <article><img src="./assets/showcase/project-cream.jpg" alt="效果预览" loading="lazy" /><span>03</span><strong>效果</strong><p>关键空间图。</p></article>
-              <article><img src="./assets/showcase/vr-panorama.jpg" alt="交付预览" loading="lazy" /><span>04</span><strong>交付</strong><p>全景与方案库。</p></article>
+              <article><img src="./assets/showcase/vr-panorama.jpg" alt="全景预览" loading="lazy" /><span>04</span><strong>全景</strong><p>直接查看 VR。</p></article>
             </div>
           </section>
 
@@ -248,8 +287,8 @@
             </div>
             <div class="resource-list">
               <div><strong>中古风</strong><p>胡桃木、暖白、低饱和软装。</p><span>可选</span></div>
-              <div><strong>奶油风</strong><p>暖白、浅木、圆润体块。</p><span>可选</span></div>
-              <div><strong>现代简约</strong><p>干净线条、浅灰材质、克制收纳。</p><span>可选</span></div>
+              <div><strong>现代奶油风</strong><p>暖白、浅木、圆润体块。</p><span>可选</span></div>
+              <div><strong>现代简约</strong><p>黑白灰、满墙收纳、简洁造型。</p><span>可选</span></div>
               <div><strong>原木风</strong><p>浅木、亚麻、自然低饱和。</p><span>可选</span></div>
             </div>
           </section>
@@ -276,6 +315,6 @@
       </section>
     </div>
 
-    <script src="./app.js?v=stable-loading" type="module"></script>
+    <script src="./app.js?v=case-and-style-library" type="module"></script>
   </body>
 </html>

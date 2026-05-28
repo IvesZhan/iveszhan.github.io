@@ -1,0 +1,77 @@
+{
+  "project_id": "广源尚居现代简约模板",
+  "project_name": "广源尚居现代简约模板",
+  "style": "modern_minimal",
+  "approval_status": "review_required",
+  "source": {
+    "provider": "provided_panorama_asset",
+    "url": "https://vr.justeasy.cn/view/171oy18506668r69-1775805590.html"
+  },
+  "ai_generation": {
+    "can_be_reference": true,
+    "reference_roles": [
+      "style_benchmark",
+      "room_prompt_anchor",
+      "quality_benchmark"
+    ],
+    "notes": [
+      "External panoramas are references for VR workflow and future AI generation prompts.",
+      "Mark approval_status=approved only after manual review."
+    ]
+  },
+  "scenes": [
+    {
+      "id": "01_92279827",
+      "name": "现代意式风全景",
+      "room_type": "other",
+      "image": "01_92279827.jpg",
+      "thumb": "01_92279827.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 65,
+      "source_url": "https://vrpic.justeasy.cn/pano/20240507/42-174649_6639f88995fee.tiles/",
+      "source_provider": "provided_panorama_asset"
+    },
+    {
+      "id": "02_100009674",
+      "name": "现代意式风全景",
+      "room_type": "other",
+      "image": "02_100009674.jpg",
+      "thumb": "02_100009674.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 65,
+      "source_url": "https://vrpic.justeasy.cn/pano/20240910/52-170033_66e00ab18fa75.tiles/",
+      "source_provider": "provided_panorama_asset"
+    },
+    {
+      "id": "03_100009675",
+      "name": "意式极简风全景",
+      "room_type": "other",
+      "image": "03_100009675.jpg",
+      "thumb": "03_100009675.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 65,
+      "source_url": "https://vrpic.justeasy.cn/pano/20240910/52-170036_66e00ab444092.tiles/",
+      "source_provider": "provided_panorama_asset"
+    },
+    {
+      "id": "04_100009676",
+      "name": "意式轻奢风全景",
+      "room_type": "other",
+      "image": "04_100009676.jpg",
+      "thumb": "04_100009676.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 65,
+      "source_url": "https://vrpic.justeasy.cn/pano/20240910/52-170038_66e00ab61e843.tiles/",
+      "source_provider": "provided_panorama_asset"
+    }
+  ],
+  "source_provider": "provided_panorama_asset"
+}

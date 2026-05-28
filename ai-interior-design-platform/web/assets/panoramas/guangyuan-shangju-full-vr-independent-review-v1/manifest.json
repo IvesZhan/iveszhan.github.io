@@ -1,0 +1,96 @@
+{
+  "project_id": "广源尚居整屋VR独立空间方案V1",
+  "project_name": "广源尚居整屋VR独立空间方案V1",
+  "style": "modern",
+  "approval_status": "review_required",
+  "source": {
+    "provider": "ai_panorama_renderer",
+    "url": "http://127.0.0.1:8189/api/v1/panorama/render"
+  },
+  "ai_generation": {
+    "can_be_reference": true,
+    "reference_roles": [
+      "style_benchmark",
+      "room_prompt_anchor",
+      "quality_benchmark"
+    ],
+    "notes": [
+      "External panoramas are references for VR workflow and future AI generation prompts.",
+      "Mark approval_status=approved only after manual review."
+    ]
+  },
+  "scenes": [
+    {
+      "id": "01_guangyuan_living",
+      "name": "客厅全景",
+      "room_type": "living",
+      "image": "01_guangyuan_living.jpg",
+      "thumb": "01_guangyuan_living.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    },
+    {
+      "id": "02_guangyuan_dining",
+      "name": "餐厅全景",
+      "room_type": "dining",
+      "image": "02_guangyuan_dining.jpg",
+      "thumb": "02_guangyuan_dining.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    },
+    {
+      "id": "03_guangyuan_kitchen",
+      "name": "厨房全景",
+      "room_type": "kitchen",
+      "image": "03_guangyuan_kitchen.jpg",
+      "thumb": "03_guangyuan_kitchen.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    },
+    {
+      "id": "04_guangyuan_hall",
+      "name": "过道全景",
+      "room_type": "hallway",
+      "image": "04_guangyuan_hall.jpg",
+      "thumb": "04_guangyuan_hall.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    },
+    {
+      "id": "05_guangyuan_master_bedroom",
+      "name": "主卧全景",
+      "room_type": "master_bedroom",
+      "image": "05_guangyuan_master_bedroom.jpg",
+      "thumb": "05_guangyuan_master_bedroom.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    },
+    {
+      "id": "06_guangyuan_balcony",
+      "name": "阳台全景",
+      "room_type": "balcony",
+      "image": "06_guangyuan_balcony.jpg",
+      "thumb": "06_guangyuan_balcony.jpg",
+      "width": 5792,
+      "height": 2896,
+      "projection": "equirectangular",
+      "quality_score": 85,
+      "source_url": "http://127.0.0.1:8189/api/v1/panorama/render"
+    }
+  ]
+}
