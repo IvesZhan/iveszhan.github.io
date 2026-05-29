@@ -1,0 +1,193 @@
+{
+  "project_id": "generated-style-library-v1",
+  "project_name": "AI生成风格库全景V1",
+  "style": "multi_style",
+  "approval_status": "review_required",
+  "source": {
+    "provider": "imagegen",
+    "url": ""
+  },
+  "ai_generation": {
+    "can_be_reference": true,
+    "reference_roles": [
+      "style_benchmark",
+      "style_library_preview",
+      "prompt_anchor"
+    ],
+    "notes": [
+      "AI generated 2:1 equirectangular panoramas for style library reference.",
+      "Use as style references, not as floor-plan matched delivery assets."
+    ]
+  },
+  "scenes": [
+    {
+      "id": "01_modern",
+      "name": "现代简约全景",
+      "category": "现代简约",
+      "style": "modern_minimal",
+      "room_type": "living",
+      "image": "01_modern.jpg",
+      "thumb": "01_modern.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "02_cream",
+      "name": "现代奶油风全景",
+      "category": "现代奶油风",
+      "style": "cream",
+      "room_type": "living",
+      "image": "02_cream.jpg",
+      "thumb": "02_cream.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "03_vintage",
+      "name": "中古风全景",
+      "category": "中古风",
+      "style": "vintage",
+      "room_type": "living",
+      "image": "03_vintage.jpg",
+      "thumb": "03_vintage.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "04_wood",
+      "name": "原木风全景",
+      "category": "原木风",
+      "style": "wood",
+      "room_type": "living",
+      "image": "04_wood.jpg",
+      "thumb": "04_wood.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "05_modern_luxury",
+      "name": "现代轻奢全景",
+      "category": "现代轻奢",
+      "style": "modern_luxury",
+      "room_type": "living",
+      "image": "05_modern_luxury.jpg",
+      "thumb": "05_modern_luxury.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "06_italian",
+      "name": "现代意式全景",
+      "category": "现代意式",
+      "style": "italian",
+      "room_type": "living",
+      "image": "06_italian.jpg",
+      "thumb": "06_italian.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "07_wabi_sabi",
+      "name": "侘寂风全景",
+      "category": "侘寂风",
+      "style": "wabi_sabi",
+      "room_type": "living",
+      "image": "07_wabi_sabi.jpg",
+      "thumb": "07_wabi_sabi.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "08_new_chinese",
+      "name": "新中式全景",
+      "category": "新中式",
+      "style": "new_chinese",
+      "room_type": "living",
+      "image": "08_new_chinese.jpg",
+      "thumb": "08_new_chinese.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "09_french",
+      "name": "轻法式全景",
+      "category": "轻法式",
+      "style": "french",
+      "room_type": "living",
+      "image": "09_french.jpg",
+      "thumb": "09_french.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "10_scandinavian",
+      "name": "北欧风全景",
+      "category": "北欧风",
+      "style": "scandinavian",
+      "room_type": "living",
+      "image": "10_scandinavian.jpg",
+      "thumb": "10_scandinavian.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "11_industrial",
+      "name": "工业风全景",
+      "category": "工业风",
+      "style": "industrial",
+      "room_type": "living",
+      "image": "11_industrial.jpg",
+      "thumb": "11_industrial.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    },
+    {
+      "id": "12_american",
+      "name": "美式风全景",
+      "category": "美式风",
+      "style": "american",
+      "room_type": "living",
+      "image": "12_american.jpg",
+      "thumb": "12_american.jpg",
+      "width": 2048,
+      "height": 1024,
+      "projection": "equirectangular",
+      "quality_score": 70,
+      "source_provider": "ai_generated_reference"
+    }
+  ],
+  "source_provider": "ai_generated_reference"
+}

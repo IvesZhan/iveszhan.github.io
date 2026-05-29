@@ -8,7 +8,7 @@
       name="description"
       content="交换空间设计平台，用于管理、生成和交付家装空间方案。"
     />
-    <link rel="stylesheet" href="./styles.css?v=case-and-style-library" />
+    <link rel="stylesheet" href="./styles.css?v=vr-psv-default" />
   </head>
   <body data-role="client">
     <header class="app-header">
@@ -20,18 +20,59 @@
         </span>
       </a>
       <nav class="app-nav" aria-label="工作台导航">
-        <button class="is-active" type="button" data-go-tab="samples">案例库</button>
+        <span class="app-nav-combo" data-nav-group aria-label="案例库与新方案">
+          <button class="app-nav-case is-active" type="button" data-go-tab="samples">案例库</button>
+          <button class="app-nav-add" type="button" data-go-tab="platform" data-designer-only aria-label="新方案">
+            <span class="app-nav-create-icon" aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false">
+                <path d="M10 5v10M5 10h10" />
+                <path d="M14.5 3.5l.45 1.15 1.15.45-1.15.45-.45 1.15-.45-1.15-1.15-.45 1.15-.45.45-1.15Z" />
+              </svg>
+            </span>
+          </button>
+        </span>
         <button type="button" data-go-tab="style-library">风格库</button>
-        <button type="button" data-go-tab="platform" data-designer-only>新方案</button>
       </nav>
+      <button class="app-login-button" type="button" data-login-action data-logged-out-only>登录</button>
+      <div class="app-account-menu" data-account-menu data-logged-in-only>
+        <button class="app-account-button" type="button" data-account-action aria-haspopup="menu" aria-expanded="false" aria-label="账号菜单">
+          <span class="app-account-avatar" data-account-avatar aria-hidden="true"></span>
+        </button>
+        <div class="app-account-panel" data-account-panel role="menu" hidden>
+          <button type="button" data-logout-action role="menuitem">退出登录</button>
+        </div>
+      </div>
     </header>
+
+    <div class="login-dialog-backdrop" data-login-dialog hidden>
+      <section class="login-dialog" role="dialog" aria-modal="true" aria-labelledby="loginDialogTitle">
+        <div class="login-dialog-head">
+          <div>
+            <span>账号登录</span>
+            <h2 id="loginDialogTitle">登录交换空间</h2>
+          </div>
+          <button class="login-dialog-close" type="button" data-login-close aria-label="关闭登录弹窗">&times;</button>
+        </div>
+        <form class="login-form" data-login-form>
+          <label>
+            <span>账号</span>
+            <input type="tel" inputmode="tel" autocomplete="username" data-login-account required />
+          </label>
+          <label>
+            <span>密码</span>
+            <input type="password" autocomplete="current-password" data-login-password required />
+          </label>
+          <p class="login-status" data-login-status aria-live="polite"></p>
+          <button class="login-submit" type="submit" data-login-submit>登录</button>
+        </form>
+      </section>
+    </div>
 
     <main class="app-main">
       <section class="view-panel is-active" id="samples" data-panel="samples" aria-label="案例库">
         <div class="workspace-shell">
           <div class="case-library-head" aria-label="案例库概览">
             <div>
-              <p class="kicker">已有方案</p>
               <h1>案例库</h1>
             </div>
           </div>
@@ -176,29 +217,77 @@
             </div>
             <div class="style-scroll">
               <div class="style-picker" aria-label="选择风格方案">
-                <button class="style-option" type="button" data-style-option="vintage" aria-pressed="false">
-                  <span class="style-cover">
-                    <img src="./assets/style-covers/vintage.png" alt="中古风空间预览" loading="lazy" />
-                  </span>
-                  <span><strong>中古风</strong><small>中浅木色、暖白、低饱和点缀</small></span>
-                </button>
-                <button class="style-option" type="button" data-style-option="cream" aria-pressed="false">
-                  <span class="style-cover">
-                    <img src="./assets/style-covers/cream.png" alt="现代奶油风空间预览" loading="lazy" />
-                  </span>
-                  <span><strong>现代奶油风</strong><small>暖白浅木、圆润家具、真实柔光</small></span>
-                </button>
                 <button class="style-option" type="button" data-style-option="modern" aria-pressed="false">
                   <span class="style-cover">
-                    <img src="./assets/style-covers/modern.png" alt="现代简约空间预览" loading="lazy" />
+                    <img src="./assets/style-covers/modern.jpg" alt="现代简约空间预览" loading="lazy" />
                   </span>
                   <span><strong>现代简约</strong><small>黑白灰、满墙收纳、简洁造型</small></span>
                 </button>
+                <button class="style-option" type="button" data-style-option="cream" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/cream.jpg" alt="现代奶油风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>现代奶油风</strong><small>暖白浅木、圆润家具、真实柔光</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="vintage" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/vintage.jpg" alt="中古风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>中古风</strong><small>中浅木色、暖白、低饱和点缀</small></span>
+                </button>
                 <button class="style-option" type="button" data-style-option="wood" aria-pressed="false">
                   <span class="style-cover">
-                    <img src="./assets/style-covers/wood.png" alt="原木风空间预览" loading="lazy" />
+                    <img src="./assets/style-covers/wood.jpg" alt="原木风空间预览" loading="lazy" />
                   </span>
                   <span><strong>原木风</strong><small>浅木、亚麻、自然低饱和</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="modern_luxury" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/modern_luxury.jpg" alt="现代轻奢空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>现代轻奢</strong><small>石材、金属、精致灯光层次</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="italian" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/italian.jpg" alt="现代意式空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>现代意式</strong><small>石材体块、皮革、克制深浅对比</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="wabi_sabi" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/wabi_sabi.jpg" alt="侘寂风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>侘寂风</strong><small>大地色、微水泥、肌理留白</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="new_chinese" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/new_chinese.jpg" alt="新中式空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>新中式</strong><small>东方木作、留白、现代中式秩序</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="french" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/french.jpg" alt="轻法式空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>轻法式</strong><small>柔和线条、奶油墙面、浪漫软装</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="scandinavian" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/scandinavian.jpg" alt="北欧风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>北欧风</strong><small>明亮浅木、生活感、低饱和彩色</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="industrial" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/industrial.jpg" alt="工业风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>工业风</strong><small>水泥肌理、黑铁、Loft 暖光</small></span>
+                </button>
+                <button class="style-option" type="button" data-style-option="american" aria-pressed="false">
+                  <span class="style-cover">
+                    <img src="./assets/style-covers/american.jpg" alt="美式风空间预览" loading="lazy" />
+                  </span>
+                  <span><strong>美式风</strong><small>护墙线条、壁灯、温厚软装</small></span>
                 </button>
               </div>
             </div>
@@ -241,7 +330,7 @@
                       <span data-effect-brief-label>上传效果说明</span>
                     </label>
                   </div>
-                  <small>支持 TXT / MD / DOCX，上传后在图纸下方显示。</small>
+                  <small>可选。支持 TXT / MD / DOCX，上传后自动匹配风格并填入设计想法。</small>
                 </div>
               </div>
               <div class="file-validation" data-floor-validation aria-live="polite"></div>
@@ -273,7 +362,7 @@
               <strong>从风格到交付</strong>
             </div>
             <div class="library-grid engine-grid">
-              <article><img src="./assets/style-covers/vintage.png" alt="风格预览" loading="lazy" /><span>01</span><strong>风格</strong><p>确定空间气质。</p></article>
+              <article><img src="./assets/style-covers/vintage.jpg" alt="风格预览" loading="lazy" /><span>01</span><strong>风格</strong><p>确定空间气质。</p></article>
               <article><img src="./assets/showcase/materials-moodboard.jpg" alt="材质预览" loading="lazy" /><span>02</span><strong>材质</strong><p>色彩和质感。</p></article>
               <article><img src="./assets/showcase/project-cream.jpg" alt="效果预览" loading="lazy" /><span>03</span><strong>效果</strong><p>关键空间图。</p></article>
               <article><img src="./assets/showcase/vr-panorama.jpg" alt="全景预览" loading="lazy" /><span>04</span><strong>全景</strong><p>直接查看 VR。</p></article>
@@ -315,6 +404,6 @@
       </section>
     </div>
 
-    <script src="./app.js?v=case-and-style-library" type="module"></script>
+    <script src="./app.js?v=vr-psv-default" type="module"></script>
   </body>
 </html>

@@ -117,6 +117,15 @@ const samples = [
     style: "现代简约",
     delivery: "真实 2:1 VR全景",
     summary: "基于广源尚居户型与效果说明生成的 6 点位整屋 VR 方案，空间独立生成并通过统一材质提示保持连续性；可直接进入全屋 VR 预览；如不满意可选择区域重新生成并记录为新版本。",
+    floorPlanImage: "./assets/floor-plans/guangyuan-shangju.svg",
+    floorMapPoints: [
+      { roomId: "living", name: "客厅", x: 56.4, y: 37.4 },
+      { roomId: "dining", name: "餐厅", x: 54.6, y: 67.6 },
+      { roomId: "kitchen", name: "厨房", x: 68.9, y: 64.0 },
+      { roomId: "hall", name: "过道", x: 50.6, y: 86.9 },
+      { roomId: "master-bedroom", name: "主卧", x: 35.5, y: 58.9 },
+      { roomId: "balcony", name: "阳台", x: 56.4, y: 12.2 },
+    ],
     rooms: [
       {
         id: "living",
@@ -462,8 +471,17 @@ const samples = [
 const vrPreviewSamples = 8;
 const vrPreviewPanoramaWidth = 4096;
 const vrPreviewPanoramaHeight = 2048;
-const showCreateCardInCaseLibrary = false;
+const showCreateCardInCaseLibrary = true;
 const staticPanoramaTemplateManifests = [
+  {
+    sampleId: "generated-style-library-v1",
+    name: "AI生成风格库",
+    title: "AI生成真实全景风格参考",
+    style: "多风格",
+    area: "风格参考",
+    manifestUrl: "./assets/panoramas/generated-style-library/manifest.json",
+    assetBaseUrl: "./assets/panoramas/generated-style-library/",
+  },
   {
     sampleId: "guangyuan-shangju-modern-template",
     name: "外部全景风格库",
@@ -475,9 +493,16 @@ const staticPanoramaTemplateManifests = [
   },
 ];
 
+const authStateStorageKey = "xspace-auth-state";
+const picwishTokenStorageKey = "xspace-picwish-api-token";
+const picwishAuthorizationStorageKey = "xspace-picwish-authorization";
+const accountProfileStorageKey = "xspace-account-profile";
+
 const role = resolveAccountRole();
 const canUseDesignerWorkspace =
   role === "designer" || APP_CONFIG.featureFlags.designerWorkspace === true;
+let isAccountLoggedIn = resolveAccountLoginState();
+let accountProfile = resolveAccountProfile();
 let availableSamples = samples
   .filter((sample) => !sample.templateOnly && (canUseDesignerWorkspace || !sample.designerOnly))
   .map(normalizeSampleState);
@@ -521,6 +546,20 @@ const renderFinalButton = document.querySelector("[data-render-final]");
 const clearAdjustmentsButton = document.querySelector("[data-clear-adjustments]");
 const versionList = document.querySelector("[data-version-list]");
 const navButtons = [...document.querySelectorAll("[data-go-tab]")];
+const navGroups = [...document.querySelectorAll("[data-nav-group]")];
+const loginButton = document.querySelector("[data-login-action]");
+const accountMenu = document.querySelector("[data-account-menu]");
+const accountButton = document.querySelector("[data-account-action]");
+const accountPanel = document.querySelector("[data-account-panel]");
+const accountAvatar = document.querySelector("[data-account-avatar]");
+const logoutButton = document.querySelector("[data-logout-action]");
+const loginDialog = document.querySelector("[data-login-dialog]");
+const loginCloseButton = document.querySelector("[data-login-close]");
+const loginForm = document.querySelector("[data-login-form]");
+const loginAccountInput = document.querySelector("[data-login-account]");
+const loginPasswordInput = document.querySelector("[data-login-password]");
+const loginStatus = document.querySelector("[data-login-status]");
+const loginSubmitButton = document.querySelector("[data-login-submit]");
 const schemeTabButtons = [...document.querySelectorAll("[data-scheme-tab]")];
 const schemePanes = [...document.querySelectorAll("[data-scheme-pane]")];
 const importStepInputs = [...document.querySelectorAll("[data-import-step]")];
@@ -552,14 +591,31 @@ let panoramaViewerMap = null;
 let panoramaViewerStatus = null;
 let panoramaViewerAutoButton = null;
 let panoramaViewerScenesToggleButton = null;
+let panoramaViewerMapToggleButton = null;
+let panoramaPhotoSphereStage = null;
+let panoramaPhotoSphereViewer = null;
+let panoramaPhotoSphereRequestId = 0;
+let photoSphereModulePromise = null;
+let photoSphereStylePromise = null;
+let panoramaViewerEngine = "legacy";
 let panoramaViewerScenes = [];
 let panoramaViewerMapPoints = [];
+let panoramaViewerRenderSpec = null;
+let panoramaViewerFloorPlan = null;
+let panoramaViewerFloorPlanImage = "";
 let activePanoramaSceneId = "";
 let panoramaViewerScenesExpanded = false;
 let panoramaDragState = null;
+const vrMinFov = 50;
+const vrDefaultFov = 90;
+const vrMaxFov = 115;
+const vrWheelFovStep = 5;
+const panoramaMinimapWidth = 155;
+const panoramaMinimapHeight = 100;
+const panoramaMinimapPadding = 5;
 let panoramaYaw = 0;
 let panoramaPitch = 0;
-let panoramaFov = 72;
+let panoramaFov = vrDefaultFov;
 let panoramaAutoRotate = false;
 let panoramaFrameId = 0;
 let panoramaLastFrameTime = 0;
@@ -569,7 +625,7 @@ let activeInlineVrSceneId = "";
 let inlineVrDragState = null;
 let inlineVrYaw = 0;
 let inlineVrPitch = 0;
-let inlineVrFov = 72;
+let inlineVrFov = vrDefaultFov;
 let inlineVrAutoRotate = true;
 let inlineVrFrameId = 0;
 let inlineVrLastFrameTime = 0;
@@ -578,38 +634,6 @@ let manualAdjustmentNotes = {};
 const importSteps = ["floor", "style"];
 const importState = Object.fromEntries(importSteps.map((step) => [step, false]));
 const stylePackages = {
-  vintage: {
-    label: "中古风",
-    defaultTemplate: {
-      id: "vintage-walnut-warm",
-      label: "中古胡桃暖调模板",
-      adjustable: ["木色深浅", "复古陈列密度", "收纳容量", "灯光暖度"],
-    },
-    title: "中古风整屋方案",
-    summary: "中古风方向，已准备空间全景和交付入口。",
-    rooms: [
-      { id: "living", name: "客餐厅效果图", image: "./assets/showcase/project-vintage.jpg", alt: "中古风客餐厅效果图" },
-      { id: "kitchen", name: "餐厨效果图", image: "./assets/showcase/detail-kitchen.jpg", alt: "中古风餐厨效果图" },
-      { id: "bedroom", name: "主卧效果图", image: "./assets/master-bedroom.jpg", alt: "中古风主卧效果图" },
-      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "中古风 VR 全景预览" },
-    ],
-  },
-  cream: {
-    label: "现代奶油风",
-    defaultTemplate: {
-      id: "cream-soft-light",
-      label: "现代奶油柔光模板",
-      adjustable: ["奶油色温", "圆润体块", "收纳容量", "软装密度"],
-    },
-    title: "现代奶油风整屋方案",
-    summary: "现代奶油风方向，已准备空间全景和交付入口。",
-    rooms: [
-      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-cream.jpg", alt: "现代奶油风客厅生成预览" },
-      { id: "kitchen", name: "餐厨效果图", image: "./assets/showcase/detail-kitchen.jpg", alt: "现代奶油风餐厨生成预览" },
-      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "现代奶油风材质生成预览" },
-      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "现代奶油风 VR 全景预览" },
-    ],
-  },
   modern: {
     label: "现代简约",
     defaultTemplate: {
@@ -617,6 +641,7 @@ const stylePackages = {
       label: "现代简洁收纳模板",
       adjustable: ["黑白灰比例", "电视柜收纳", "开放厨房程度", "墙面造型复杂度"],
     },
+    defaultIdea: "整体按现代简约方向生成，强调黑白灰比例、干净收纳、简洁墙面和通透动线，避免复杂造型和过多装饰。",
     title: "现代简约整屋方案",
     summary: "现代简约方向，已准备空间全景和交付入口。",
     rooms: [
@@ -626,6 +651,40 @@ const stylePackages = {
       { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "现代简约 VR 全景预览" },
     ],
   },
+  cream: {
+    label: "现代奶油风",
+    defaultTemplate: {
+      id: "cream-soft-light",
+      label: "现代奶油柔光模板",
+      adjustable: ["奶油色温", "圆润体块", "收纳容量", "软装密度"],
+    },
+    defaultIdea: "整体按现代奶油风生成，使用暖白浅木、圆润家具、柔和灯光和低对比材质，空间保持温柔明亮。",
+    title: "现代奶油风整屋方案",
+    summary: "现代奶油风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-cream.jpg", alt: "现代奶油风客厅生成预览" },
+      { id: "kitchen", name: "餐厨效果图", image: "./assets/showcase/detail-kitchen.jpg", alt: "现代奶油风餐厨生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "现代奶油风材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "现代奶油风 VR 全景预览" },
+    ],
+  },
+  vintage: {
+    label: "中古风",
+    defaultTemplate: {
+      id: "vintage-walnut-warm",
+      label: "中古胡桃暖调模板",
+      adjustable: ["木色深浅", "复古陈列密度", "收纳容量", "灯光暖度"],
+    },
+    defaultIdea: "整体按中古风生成，强调胡桃木、复古家具、暖色灯光和低饱和软装，陈列有生活感但不过度堆满。",
+    title: "中古风整屋方案",
+    summary: "中古风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客餐厅效果图", image: "./assets/showcase/project-vintage.jpg", alt: "中古风客餐厅效果图" },
+      { id: "kitchen", name: "餐厨效果图", image: "./assets/showcase/detail-kitchen.jpg", alt: "中古风餐厨效果图" },
+      { id: "bedroom", name: "主卧效果图", image: "./assets/master-bedroom.jpg", alt: "中古风主卧效果图" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "中古风 VR 全景预览" },
+    ],
+  },
   wood: {
     label: "原木风",
     defaultTemplate: {
@@ -633,6 +692,7 @@ const stylePackages = {
       label: "自然原木通透模板",
       adjustable: ["木色暖度", "自然软装密度", "收纳容量", "空间通透感"],
     },
+    defaultIdea: "整体按原木风生成，使用浅木、亚麻、纸灯和自然采光，空间保持通透、温和、低饱和。",
     title: "原木风整屋方案",
     summary: "原木风方向，已准备空间全景和交付入口。",
     rooms: [
@@ -642,18 +702,162 @@ const stylePackages = {
       { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "原木风 VR 全景预览" },
     ],
   },
+  modern_luxury: {
+    label: "现代轻奢",
+    defaultTemplate: {
+      id: "modern-luxury-stone-metal",
+      label: "现代轻奢石材金属模板",
+      adjustable: ["石材比例", "金属点缀", "灯带层次", "软装精致度"],
+    },
+    defaultIdea: "整体按现代轻奢生成，突出大板石材、克制金属、精致灯带和高级灰暖调，保持质感但不要过度奢华。",
+    title: "现代轻奢整屋方案",
+    summary: "现代轻奢方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-modern_luxury.jpg", alt: "现代轻奢客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "现代轻奢材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "现代轻奢 VR 全景预览" },
+    ],
+  },
+  italian: {
+    label: "现代意式",
+    defaultTemplate: {
+      id: "italian-minimal-stone",
+      label: "现代意式极简模板",
+      adjustable: ["深浅对比", "石材体量", "皮革软装", "线性灯光"],
+    },
+    defaultIdea: "整体按现代意式生成，使用深色木作、石材体块、皮革软装和线性灯光，空间克制、高级、低矮舒展。",
+    title: "现代意式整屋方案",
+    summary: "现代意式方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-italian.jpg", alt: "现代意式客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "现代意式材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "现代意式 VR 全景预览" },
+    ],
+  },
+  wabi_sabi: {
+    label: "侘寂风",
+    defaultTemplate: {
+      id: "wabi-sabi-earth-calm",
+      label: "侘寂大地肌理模板",
+      adjustable: ["肌理粗细", "留白比例", "木石比例", "灯光柔度"],
+    },
+    defaultIdea: "整体按侘寂风生成，强调大地色、微水泥肌理、自然木石和安静留白，避免亮面材质和复杂装饰。",
+    title: "侘寂风整屋方案",
+    summary: "侘寂风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-wabi_sabi.jpg", alt: "侘寂风客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "侘寂风材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "侘寂风 VR 全景预览" },
+    ],
+  },
+  new_chinese: {
+    label: "新中式",
+    defaultTemplate: {
+      id: "new-chinese-modern-wood",
+      label: "新中式现代木作模板",
+      adjustable: ["木作比例", "中式符号密度", "留白比例", "暖光层次"],
+    },
+    defaultIdea: "整体按新中式生成，使用深色木作、格栅、东方留白和温润灯光，中式符号克制现代化。",
+    title: "新中式整屋方案",
+    summary: "新中式方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-new_chinese.jpg", alt: "新中式客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "新中式材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "新中式 VR 全景预览" },
+    ],
+  },
+  french: {
+    label: "轻法式",
+    defaultTemplate: {
+      id: "french-soft-molding",
+      label: "轻法式柔和线条模板",
+      adjustable: ["线条复杂度", "奶油色温", "金属点缀", "软装浪漫度"],
+    },
+    defaultIdea: "整体按轻法式生成，使用柔和石膏线、拱形、奶油墙面、黄铜壁灯和浪漫软装，保持轻盈不过度繁复。",
+    title: "轻法式整屋方案",
+    summary: "轻法式方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-french.jpg", alt: "轻法式客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "轻法式材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "轻法式 VR 全景预览" },
+    ],
+  },
+  scandinavian: {
+    label: "北欧风",
+    defaultTemplate: {
+      id: "scandinavian-bright-living",
+      label: "北欧明亮生活模板",
+      adjustable: ["浅木比例", "彩色软装", "收纳开放度", "自然光感"],
+    },
+    defaultIdea: "整体按北欧风生成，使用明亮白墙、浅木、自然光、绿植和低饱和彩色软装，强调生活感和实用收纳。",
+    title: "北欧风整屋方案",
+    summary: "北欧风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-scandinavian.jpg", alt: "北欧风客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "北欧风材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "北欧风 VR 全景预览" },
+    ],
+  },
+  industrial: {
+    label: "工业风",
+    defaultTemplate: {
+      id: "industrial-dark-loft",
+      label: "工业风暗色金属模板",
+      adjustable: ["水泥肌理", "黑色金属比例", "裸露元素", "暖光层次"],
+    },
+    defaultIdea: "整体按工业风生成，使用水泥肌理、黑铁、深色木、皮革和轨道灯，保持 Loft 氛围但适合居住。",
+    title: "工业风整屋方案",
+    summary: "工业风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-industrial.jpg", alt: "工业风客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "工业风材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "工业风 VR 全景预览" },
+    ],
+  },
+  american: {
+    label: "美式风",
+    defaultTemplate: {
+      id: "american-classic-soft",
+      label: "美式轻经典模板",
+      adjustable: ["护墙线条", "木色深浅", "软装厚度", "壁灯氛围"],
+    },
+    defaultIdea: "整体按美式风生成，使用护墙线条、壁炉或壁灯、温厚木色和舒适软装，经典但不要厚重老气。",
+    title: "美式风整屋方案",
+    summary: "美式风方向，已准备空间全景和交付入口。",
+    rooms: [
+      { id: "living", name: "客厅效果图", image: "./assets/showcase/project-american.jpg", alt: "美式风客厅生成预览" },
+      { id: "materials", name: "材质板", image: "./assets/showcase/materials-moodboard.jpg", alt: "美式风材质生成预览" },
+      { id: "vr", name: "VR 全景", image: "./assets/showcase/vr-panorama.jpg", alt: "美式风 VR 全景预览" },
+    ],
+  },
 };
 const effectBriefStyleAliases = {
-  vintage: ["中古风", "中古", "复古", "mid-century", "mid century", "vintage"],
-  cream: ["现代奶油风", "奶油风", "奶油", "cream", "cream style", "modern cream", "modern_cream"],
   modern: ["现代风", "现代简约风", "现代简约", "现代", "简约", "modern", "minimal"],
+  cream: ["现代奶油风", "奶油风", "奶油", "cream", "cream style", "modern cream", "modern_cream"],
+  vintage: ["中古风", "中古", "复古", "mid-century", "mid century", "vintage"],
   wood: ["原木风", "原木", "日式原木", "wood"],
+  modern_luxury: ["现代轻奢", "轻奢", "light luxury", "luxury"],
+  italian: ["现代意式", "意式", "意式极简", "italian", "italian minimal"],
+  wabi_sabi: ["侘寂风", "侘寂", "诧寂", "wabi sabi", "wabi-sabi"],
+  new_chinese: ["新中式", "中式", "现代中式", "宋式", "chinese"],
+  french: ["轻法式", "法式", "法式奶油", "french"],
+  scandinavian: ["北欧风", "北欧", "scandinavian", "nordic"],
+  industrial: ["工业风", "工业", "loft", "industrial"],
+  american: ["美式风", "美式", "american"],
 };
 const effectBriefStyleSignals = {
   modern: ["黑白灰", "黑白", "简单", "简洁", "简约", "不做复杂", "不要复杂", "复杂造型", "复杂墙板", "满墙电视柜", "电视柜做满墙", "收纳", "浅灰", "黑色收边"],
   cream: ["暖白", "米杏", "象牙白", "圆润", "柔光", "浅木", "奶油色", "弧形", "软糯"],
   vintage: ["胡桃木", "藤编", "焦糖", "复古", "低饱和", "中古", "橄榄绿", "暖棕"],
   wood: ["原木", "自然", "浅木", "亚麻", "纸灯", "木色", "留白", "绿植"],
+  modern_luxury: ["轻奢", "金属", "石材", "岩板", "高级灰", "精致"],
+  italian: ["意式", "极简", "深色木", "皮革", "石材体块", "线性"],
+  wabi_sabi: ["侘寂", "诧寂", "微水泥", "肌理", "大地色", "留白"],
+  new_chinese: ["新中式", "中式", "木格栅", "山水", "宋式", "东方"],
+  french: ["法式", "轻法", "石膏线", "拱形", "浪漫", "雕花"],
+  scandinavian: ["北欧", "明亮", "浅木", "彩色软装", "生活感"],
+  industrial: ["工业", "水泥", "黑铁", "裸露", "loft"],
+  american: ["美式", "护墙板", "壁炉", "复古皮革", "壁灯"],
 };
 const acceptedFloorExtensions = [".dxf", ".dwg"];
 const requiredFloorLayerRules = [
@@ -723,6 +927,16 @@ const floorPreviewHeight = 1000;
 const floorPreviewPadding = 34;
 const svgNamespace = "http://www.w3.org/2000/svg";
 const floorPlanGeometryRoles = new Set(["wall", "room_boundary", "door", "window", "column", "beam"]);
+const floorPreviewBoundsRolePriority = [
+  new Set(["room_boundary"]),
+  new Set(["wall", "column", "beam"]),
+  floorPlanGeometryRoles,
+];
+const floorPreviewFocusMinItemCount = 12;
+const floorPreviewFocusMinPointCount = 36;
+const floorPreviewFocusQuantile = 0.08;
+const floorPreviewFocusPaddingRatio = 0.18;
+const floorPreviewVisibleBoundsPaddingRatio = 0.08;
 
 let activeTab = "samples";
 let activeSampleId = availableSamples[0]?.id || "";
@@ -737,6 +951,7 @@ let selectedFloorFile = null;
 let selectedStyleId = "";
 let effectBriefDocument = null;
 let isEditingEffectBrief = false;
+let pendingLoginTab = "";
 let isGeneratingPlan = false;
 let isRenderingFinal = false;
 let currentRenderJobId = "";
@@ -788,6 +1003,7 @@ const adjustmentPromptDeltas = {
 };
 
 applyRole();
+applyAuthState();
 configureLocalPreview();
 bindNavigation();
 bindStyleLibraryTools();
@@ -807,8 +1023,219 @@ function resolveAccountRole() {
   return queryRole || accountRole || storedRole || APP_CONFIG.account.role || "client";
 }
 
+function resolveAccountLoginState() {
+  const queryAuth = new URLSearchParams(window.location.search).get("auth");
+  const storedAuth = window.localStorage.getItem(authStateStorageKey);
+  if (queryAuth === "logged-out") {
+    return false;
+  }
+  if (queryAuth === "logged-in") {
+    return true;
+  }
+  return Boolean(
+      window.XSPACE_ACCOUNT?.isLoggedIn ||
+      window.XSPACE_ACCOUNT?.id ||
+      window.XSPACE_ACCOUNT?.name ||
+      (storedAuth === "signed-in" && Boolean(window.localStorage.getItem(picwishAuthorizationStorageKey)))
+  );
+}
+
+function resolveAccountProfile() {
+  const storedProfile = window.localStorage.getItem(accountProfileStorageKey);
+  if (storedProfile) {
+    try {
+      const parsed = JSON.parse(storedProfile);
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+    } catch (error) {
+      window.localStorage.removeItem(accountProfileStorageKey);
+    }
+  }
+  return window.XSPACE_ACCOUNT || {};
+}
+
 function applyRole() {
   body.dataset.role = canUseDesignerWorkspace ? "designer" : "client";
+}
+
+function applyAuthState() {
+  body.dataset.auth = isAccountLoggedIn ? "logged-in" : "logged-out";
+  updateAccountAvatar();
+  if (!isAccountLoggedIn) {
+    closeAccountMenu();
+  }
+}
+
+function handleLoginAction() {
+  openLoginDialog();
+}
+
+function openLoginDialog(nextTab = "") {
+  if (!loginDialog) {
+    return;
+  }
+  pendingLoginTab = nextTab;
+  loginDialog.hidden = false;
+  body.classList.add("is-login-dialog-open");
+  setLoginStatus("");
+  window.setTimeout(() => loginAccountInput?.focus(), 0);
+}
+
+function closeLoginDialog() {
+  if (!loginDialog) {
+    return;
+  }
+  loginDialog.hidden = true;
+  body.classList.remove("is-login-dialog-open");
+  pendingLoginTab = "";
+  setLoginSubmitting(false);
+}
+
+function setLoginStatus(message, state = "error") {
+  if (!loginStatus) {
+    return;
+  }
+  loginStatus.textContent = message;
+  loginStatus.dataset.state = state;
+}
+
+function setLoginSubmitting(isSubmitting) {
+  if (loginSubmitButton) {
+    loginSubmitButton.disabled = isSubmitting;
+    loginSubmitButton.textContent = isSubmitting ? "登录中" : "登录";
+  }
+}
+
+function getLoginEndpoint() {
+  return APP_CONFIG.account.loginEndpoint || window.XSPACE_LOGIN_ENDPOINT || "https://aw.aoscdn.com/base/passport/v2/login/telephone";
+}
+
+function getPicWishAuthorization() {
+  return window.localStorage.getItem(picwishAuthorizationStorageKey) || "";
+}
+
+function buildPicWishAuthorization(token) {
+  const trimmedToken = String(token || "").trim();
+  if (!trimmedToken) {
+    return "";
+  }
+  return trimmedToken.toLowerCase().startsWith("bearer ") ? trimmedToken : `Bearer ${trimmedToken}`;
+}
+
+function persistPicWishAccount(data) {
+  const apiToken = String(data?.api_token || "").trim();
+  if (!apiToken) {
+    throw new Error("登录成功但没有返回 PicWish token。");
+  }
+  accountProfile = {
+    nickname: data?.nickname || "",
+    avatar: data?.avatar || "",
+    telephone: data?.telephone || "",
+    userId: data?.user_id || "",
+  };
+  const authorization = buildPicWishAuthorization(apiToken);
+  window.localStorage.setItem(authStateStorageKey, "signed-in");
+  window.localStorage.setItem(picwishTokenStorageKey, apiToken);
+  window.localStorage.setItem(picwishAuthorizationStorageKey, authorization);
+  window.localStorage.setItem(accountProfileStorageKey, JSON.stringify(accountProfile));
+  window.XSPACE_PICWISH_API_TOKEN = apiToken;
+  window.XSPACE_PICWISH_AUTHORIZATION = authorization;
+}
+
+function clearPicWishAccount() {
+  isAccountLoggedIn = false;
+  accountProfile = {};
+  window.localStorage.removeItem(authStateStorageKey);
+  window.localStorage.removeItem(picwishTokenStorageKey);
+  window.localStorage.removeItem(picwishAuthorizationStorageKey);
+  window.localStorage.removeItem(accountProfileStorageKey);
+  delete window.XSPACE_PICWISH_API_TOKEN;
+  delete window.XSPACE_PICWISH_AUTHORIZATION;
+  applyAuthState();
+  if (requiresLoginForTab(activeTab)) {
+    setTab("samples");
+  }
+}
+
+function updateAccountAvatar() {
+  if (!accountAvatar) {
+    return;
+  }
+  const label = accountProfile.nickname || accountProfile.telephone || "交换空间";
+  accountAvatar.dataset.initial = String(label).trim().slice(0, 1).toUpperCase() || "交";
+  if (accountButton) {
+    accountButton.setAttribute("aria-label", `${label}账号菜单`);
+  }
+}
+
+function toggleAccountMenu() {
+  if (!accountPanel || !accountButton) {
+    return;
+  }
+  const isOpen = accountPanel.hidden;
+  accountPanel.hidden = !isOpen;
+  accountButton.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeAccountMenu() {
+  if (accountPanel) {
+    accountPanel.hidden = true;
+  }
+  accountButton?.setAttribute("aria-expanded", "false");
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  const telephone = loginAccountInput?.value.trim().replace(/\s+/g, "") || "";
+  const password = loginPasswordInput?.value || "";
+  if (!telephone || !password) {
+    setLoginStatus("请输入账号和密码。");
+    return;
+  }
+
+  const endpoint = getLoginEndpoint();
+  if (!endpoint) {
+    setLoginStatus("登录接口待接入，收到接口后会在这里提交账号密码。");
+    return;
+  }
+
+  setLoginSubmitting(true);
+  setLoginStatus("");
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        password,
+        telephone,
+        country_code: APP_CONFIG.account.countryCode || "+86",
+        product_id: String(APP_CONFIG.account.productId || "482"),
+        language: APP_CONFIG.account.language || "zh",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.status !== 200 || !payload?.data?.api_token) {
+      throw new Error(payload?.message || payload?.detail || "登录失败，请检查账号和密码。");
+    }
+    persistPicWishAccount(payload.data);
+    isAccountLoggedIn = true;
+    applyAuthState();
+    const targetTab = pendingLoginTab;
+    closeLoginDialog();
+    if (targetTab) {
+      setTab(targetTab);
+    }
+  } catch (error) {
+    setLoginStatus(error.message || "登录失败，请稍后重试。");
+  } finally {
+    setLoginSubmitting(false);
+  }
 }
 
 function configureLocalPreview() {
@@ -1004,6 +1431,7 @@ function normalizePersistedScenes(scenes) {
     sourceProvider: scene.sourceProvider || scene.source_provider,
     providerTaskId: scene.providerTaskId || scene.provider_task_id || "",
     sourceResourceIds: scene.sourceResourceIds || scene.source_resource_ids || [],
+    hotspots: [],
     qualityStatus: scene.qualityStatus || scene.quality_status,
     qualityNotes: scene.qualityNotes || scene.quality_notes || [],
     shot_type: scene.shot_type || "panorama",
@@ -1048,7 +1476,7 @@ function createSampleFromStaticPanoramaManifest(project, manifest) {
   return (manifest.scenes || []).map((scene, index) => {
     const name = formatCompleteTemplateSceneName(scene, index);
     const image = `${project.assetBaseUrl}${scene.image}`;
-    const category = inferTemplateCaseCategory(scene, name);
+    const category = String(scene.category || scene.case_category || "").trim() || inferTemplateCaseCategory(scene, name);
     const serial = String(index + 1).padStart(2, "0");
     const caseName = `${category} ${serial}`;
     const caseId = `${project.sampleId}-${scene.id || serial}`;
@@ -1155,14 +1583,20 @@ function formatCompleteTemplateSceneName(scene, index) {
 
 function inferTemplateCaseCategory(scene, fallbackName = "") {
   const text = `${scene?.name || ""} ${fallbackName}`;
+  if (/现代奶油|奶油/.test(text)) return "现代奶油风";
+  if (/现代意式|意式/.test(text)) return "现代意式";
+  if (/现代轻奢|轻奢/.test(text)) return "现代轻奢";
+  if (/侘寂|诧寂/.test(text)) return "侘寂风";
+  if (/北欧/.test(text)) return "北欧风";
+  if (/工业|loft/i.test(text)) return "工业风";
+  if (/美式/.test(text)) return "美式风";
   if (/意式/.test(text)) return "现代意式";
   if (/极简/.test(text)) return "现代极简";
   if (/现代轻奢|轻奢/.test(text)) return "现代轻奢";
   if (/简约|简欧/.test(text)) return "现代简约";
-  if (/奶油/.test(text)) return "现代奶油";
   if (/中古/.test(text)) return "中古风";
   if (/新中式|中式|宋式|红木/.test(text)) return "新中式";
-  if (/法式|轻法/.test(text)) return "法式";
+  if (/法式|轻法/.test(text)) return "轻法式";
   if (/复古/.test(text)) return "复古风";
   if (/原木/.test(text)) return "原木风";
   if (/欧式|美式|西班牙/.test(text)) return "欧式美式";
@@ -1183,8 +1617,33 @@ function bindNavigation() {
   document.querySelectorAll("[data-go-tab]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
+      if (requiresLoginForTab(button.dataset.goTab) && !isAccountLoggedIn) {
+        openLoginDialog(button.dataset.goTab);
+        return;
+      }
       setTab(button.dataset.goTab);
     });
+  });
+
+  loginButton?.addEventListener("click", handleLoginAction);
+  accountButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleAccountMenu();
+  });
+  accountMenu?.addEventListener("click", (event) => event.stopPropagation());
+  logoutButton?.addEventListener("click", clearPicWishAccount);
+  document.addEventListener("click", closeAccountMenu);
+  loginCloseButton?.addEventListener("click", closeLoginDialog);
+  loginForm?.addEventListener("submit", handleLoginSubmit);
+  loginDialog?.addEventListener("click", (event) => {
+    if (event.target === loginDialog) {
+      closeLoginDialog();
+    }
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && loginDialog && !loginDialog.hidden) {
+      closeLoginDialog();
+    }
   });
 
   document.querySelectorAll("[data-open-scheme]").forEach((button) => {
@@ -1267,8 +1726,30 @@ function selectStylePackage(styleId) {
     button.setAttribute("aria-pressed", String(isSelected));
   });
 
+  syncDesignIdeaForSelectedStyle();
   clearGenerationStatus();
   updateGenerateState();
+}
+
+function syncDesignIdeaForSelectedStyle() {
+  if (!designIdeaInput || !selectedStyleId) {
+    return;
+  }
+
+  designIdeaInput.value = getDesignIdeaForStyle(selectedStyleId);
+}
+
+function getDesignIdeaForStyle(styleId) {
+  if (shouldUseEffectBriefAsDesignIdea(styleId)) {
+    return normalizeEffectBriefText(effectBriefDocument.content);
+  }
+
+  return stylePackages[styleId]?.defaultIdea || "";
+}
+
+function shouldUseEffectBriefAsDesignIdea(styleId) {
+  const briefStyleId = effectBriefDocument?.parsed?.styleId || "";
+  return Boolean(styleId && briefStyleId && styleId === briefStyleId && effectBriefDocument?.content?.trim());
 }
 
 async function handleGeneratePlan() {
@@ -1302,7 +1783,7 @@ async function handleGeneratePlan() {
   setGenerationStatus({
     status: "running",
     title: "正在生成第一版方案",
-    messages: ["解析户型图和效果说明", `套用${stylePackage.label}风格规则`, "生成整屋设计状态和各区域全景任务"],
+    messages: [effectBriefDocument ? "解析户型图和效果说明" : "解析户型图和默认设计想法", `套用${stylePackage.label}风格规则`, "生成整屋设计状态和各区域全景任务"],
   });
   updateGenerateState();
 
@@ -1333,7 +1814,7 @@ async function handleGeneratePlan() {
     setGenerationStatus({
       status: "complete",
       title: "已生成第一版方案",
-      messages: [`${sample.name} · ${version.title}`, "已写入户型图、整屋设计状态、各区域真实全景和版本记录。"],
+      messages: [`${sample.name} · ${version.title}`, "已同步到方案库，所有用户都可以查看。"],
     });
     setSchemePane("preview");
     setTab("scheme-detail");
@@ -1357,7 +1838,7 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
   }
 
   const formData = new FormData();
-  const effectiveStyleId = effectBriefDocument?.parsed?.styleId || styleId;
+  const effectiveStyleId = stylePackages[styleId] ? styleId : (effectBriefDocument?.parsed?.styleId || "cream");
   const effectiveStylePackage = stylePackages[effectiveStyleId] || stylePackage;
   formData.append("file", file);
   formData.append("style", effectiveStyleId);
@@ -1400,6 +1881,7 @@ async function renderRealPanoramaVersionWithBackend(sample, onProgress = () => {
       rooms: Array.isArray(options.rooms) ? options.rooms : (Array.isArray(config.rooms) ? config.rooms : undefined),
       render_spec: getBaseRenderSpecForFinalGeneration(sample),
       adjustments: Array.isArray(options.adjustments) ? options.adjustments : sample.adjustments || [],
+      picwish_authorization: getPicWishAuthorization(),
     }),
   });
   if (!response.ok) {
@@ -1478,7 +1960,7 @@ function wait(milliseconds) {
 function buildDesignBriefText(file, stylePackage) {
   const projectName = normalizeProjectName(file.name);
   const idea = designIdeaInput?.value.trim();
-  const effectBriefText = effectBriefDocument?.content?.trim();
+  const effectBriefText = shouldUseEffectBriefAsDesignIdea(selectedStyleId) ? effectBriefDocument?.content?.trim() : "";
   const ideaDuplicatesBrief = effectBriefText && normalizeEffectBriefText(idea) === normalizeEffectBriefText(effectBriefText);
   const wholeHomeBrief = ideaDuplicatesBrief
     ? "以效果说明文档为主生成第一版方案。"
@@ -1884,7 +2366,7 @@ async function handleRenderFinalVersion() {
     setRenderStatus({
       status: "complete",
       title: "当前区域已重新生成",
-      messages: [`${version.title} 已记录到版本。`, "预览页已更新为新的整屋 VR。"],
+      messages: [`${version.title} 已同步到方案库。`, "所有用户进入该案例时都会看到最新版本记录。"],
     });
     renderSampleList();
     renderScheme();
@@ -2204,7 +2686,7 @@ function normalizeFinalScene(scene, sample) {
     width: scene.width,
     height: scene.height,
     roomId: scene.room_id || scene.target_room_id,
-    hotspots: scene.hotspots || [],
+    hotspots: [],
     sourceProvider: scene.source_provider || scene.sourceProvider || "",
     qualityStatus: normalizeQualityStatus(scene.quality_status || scene.qualityStatus),
     deliverable: Boolean(scene.deliverable),
@@ -2253,7 +2735,7 @@ function buildVrPackageFromScenes(sample, scenes, versionId) {
       sceneId: scene.id,
       roomId: scene.roomId,
       name: scene.name,
-      ...panoramaMapPoint(index, panoramaScenes.length),
+      ...resolveSampleFloorMapPoint(sample, scene, index, panoramaScenes.length),
     })),
     shareMeta: {
       title: deliverable ? `${sample.name} VR 全景方案` : realPanorama ? `${sample.name} 真实全景资源` : `${sample.name} 不可交付预览`,
@@ -2270,6 +2752,15 @@ function buildVrPackageFromScenes(sample, scenes, versionId) {
   };
 }
 
+function resolveSampleFloorMapPoint(sample, scene, index, count) {
+  const point = (sample?.floorMapPoints || sample?.floor_map_points || []).find((item) => {
+    const sceneId = item.sceneId || item.scene_id;
+    const roomId = item.roomId || item.room_id;
+    return sceneId === scene.id || sceneId === scene.sceneId || roomId === scene.roomId || roomId === scene.room_id;
+  });
+  return point ? { x: point.x, y: point.y } : panoramaMapPoint(index, count);
+}
+
 function normalizeVrScene(scene, sample) {
   const id = scene.scene_id || scene.id;
   const name = scene.name || formatVrPanoramaSceneName(scene);
@@ -2281,12 +2772,13 @@ function normalizeVrScene(scene, sample) {
     name,
     image: scene.panorama_url || scene.image,
     preview: scene.thumb_url || scene.preview || scene.panorama_url || scene.image,
+    poster: scene.poster_url || scene.poster || scene.thumb_url || scene.preview || scene.panorama_url || scene.image,
     alt: `${sample.name} ${name} VR 全景`,
     shot_type: "panorama",
     projection: scene.projection || "equirectangular",
     width: scene.width || vrPreviewPanoramaWidth,
     height: scene.height || vrPreviewPanoramaHeight,
-    hotspots: scene.hotspots || [],
+    hotspots: [],
     sourceProvider: scene.source_provider || scene.sourceProvider || "",
     providerTaskId: scene.provider_task_id || scene.providerTaskId || "",
     sourceResourceIds: scene.source_resource_ids || scene.sourceResourceIds || [],
@@ -2323,7 +2815,16 @@ function normalizeQualityStatus(value) {
 }
 
 function isDeliverableVrPackage(vrPackage) {
-  return isRealPanoramaPackage(vrPackage) || (Boolean(vrPackage?.deliverable) && vrPackage.qualityStatus === "production");
+  const locallyAcceptable = isVrPackageLocallyAcceptable(vrPackage);
+  return locallyAcceptable && (isRealPanoramaPackage(vrPackage) || (Boolean(vrPackage?.deliverable) && vrPackage.qualityStatus === "production"));
+}
+
+function isVrPackageLocallyAcceptable(vrPackage) {
+  const scenes = vrPackage?.scenes || [];
+  if (!scenes.length) {
+    return true;
+  }
+  return scenes.every((scene) => getSceneVrQualityReport(scene).status !== "review_required");
 }
 
 function isRealPanoramaPackage(vrPackage) {
@@ -2350,6 +2851,101 @@ function getVrQualityLabel(vrPackage) {
     return "可查看 VR 全景";
   }
   return "不可交付预览";
+}
+
+function getVrViewerConfig() {
+  return APP_CONFIG.vrViewer || {};
+}
+
+function getRequestedVrViewerEngine() {
+  return "photoSphere";
+}
+
+function loadStylesheetOnce(url, id) {
+  if (!url) {
+    return Promise.resolve();
+  }
+  if (document.getElementById(id)) {
+    return Promise.resolve();
+  }
+  if (!photoSphereStylePromise) {
+    photoSphereStylePromise = new Promise((resolve, reject) => {
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = url;
+      link.onload = resolve;
+      link.onerror = () => reject(new Error(`Failed to load stylesheet: ${url}`));
+      document.head.append(link);
+    });
+  }
+  return photoSphereStylePromise;
+}
+
+function loadPhotoSphereModule() {
+  const config = getVrViewerConfig().photoSphere || {};
+  const moduleUrl = config.moduleUrl || "https://esm.sh/@photo-sphere-viewer/core@5?bundle";
+  if (!photoSphereModulePromise) {
+    photoSphereModulePromise = Promise.all([
+      loadStylesheetOnce(config.stylesheetUrl, "photo-sphere-viewer-core-css"),
+      import(moduleUrl),
+    ]).then(([, module]) => module);
+  }
+  return photoSphereModulePromise;
+}
+
+function getSceneVrQualityReport(scene) {
+  const width = Number(scene?.width) || 0;
+  const height = Number(scene?.height) || 0;
+  const ratio = width && height ? width / height : 0;
+  const notes = [];
+  if (!width || !height) {
+    notes.push("缺少图片尺寸元数据");
+  } else {
+    if (Math.abs(ratio - 2) > 0.04) {
+      notes.push("不是稳定 2:1 全景比例");
+    }
+    if (width < vrPreviewPanoramaWidth || height < vrPreviewPanoramaHeight) {
+      notes.push(`低于本机演示 ${vrPreviewPanoramaWidth}x${vrPreviewPanoramaHeight}`);
+    }
+    if (width >= 8192 && height >= 4096) {
+      notes.push("达到客户终版尺寸目标");
+    }
+  }
+  const qualityNotes = scene?.qualityNotes || scene?.quality_notes || [];
+  if (Array.isArray(qualityNotes)) {
+    notes.push(...qualityNotes);
+  }
+  const status = notes.some((note) => note.includes("低于") || note.includes("不是稳定"))
+    ? "review_required"
+    : normalizeQualityStatus(scene?.qualityStatus || scene?.quality_status);
+  return {
+    width,
+    height,
+    ratio,
+    status,
+    label: width && height ? `${width}x${height}` : "尺寸待补",
+    notes,
+  };
+}
+
+function buildVrQualityReport(scenes) {
+  return scenes.map((scene) => ({
+    sceneId: scene.id,
+    name: scene.name,
+    sourceProvider: scene.sourceProvider || scene.source_provider || "",
+    deliverable: Boolean(scene.deliverable),
+    ...getSceneVrQualityReport(scene),
+  }));
+}
+
+function updateWindowVrQualityReport(report) {
+  window.__xspaceVrQualityReport = report;
+  try {
+    window.sessionStorage?.setItem("xspaceVrQualityReport", JSON.stringify(report));
+  } catch {
+    // Internal diagnostic only; VR viewing should not fail if storage is unavailable.
+  }
 }
 
 function setGenerationStatus({ status, title, messages }) {
@@ -2921,14 +3517,14 @@ function getEffectBriefParseErrors() {
 
 function applyEffectBriefToInputs(content) {
   const normalizedContent = normalizeEffectBriefText(content);
-  if (designIdeaInput) {
-    designIdeaInput.value = normalizedContent;
-  }
-
   const detectedStyleId = effectBriefDocument?.parsed?.styleId || detectStyleFromEffectBrief(normalizedContent);
   if (detectedStyleId) {
     selectStylePackage(detectedStyleId);
     return;
+  }
+
+  if (designIdeaInput) {
+    designIdeaInput.value = normalizedContent;
   }
 
   if (effectBriefDocument?.parsed?.styleText) {
@@ -3051,14 +3647,16 @@ function validateDraftAgainstEffectBrief(draft) {
 
   const errors = [];
   const designBrief = draft?.design_brief || {};
-  if (parsed.styleId) {
+  const expectedStyleId = selectedStyleId || parsed.styleId || "";
+  const shouldValidateBriefDetails = shouldUseEffectBriefAsDesignIdea(expectedStyleId);
+  if (expectedStyleId) {
     const generatedStyleId = String(draft?.design_plan?.style || "").toLowerCase();
-    if (generatedStyleId !== parsed.styleId) {
-      errors.push(`风格应为 ${stylePackages[parsed.styleId]?.label || parsed.styleId}，实际生成 ${draft?.design_plan?.style_label || generatedStyleId || "未识别"}。`);
+    if (generatedStyleId !== expectedStyleId) {
+      errors.push(`风格应为 ${stylePackages[expectedStyleId]?.label || expectedStyleId}，实际生成 ${draft?.design_plan?.style_label || generatedStyleId || "未识别"}。`);
     }
   }
 
-  if (parsed.areaM2) {
+  if (shouldValidateBriefDetails && parsed.areaM2) {
     const parsedArea = parseEffectBriefArea(designBrief.area);
     if (!parsedArea) {
       errors.push("后端生成结果缺少效果说明中的户型面积。");
@@ -3067,7 +3665,7 @@ function validateDraftAgainstEffectBrief(draft) {
     }
   }
 
-  if (parsed.floorHeight) {
+  if (shouldValidateBriefDetails && parsed.floorHeight) {
     const briefHeight = Number(designBrief.floor_height);
     const floorPlanHeight = Number(draft?.floor_plan?.floor_height);
     const renderHeight = Number(draft?.render_spec?.floor_height);
@@ -3332,7 +3930,7 @@ async function readApiError(response) {
 async function persistProjectVersion(sample, version, result = {}) {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl || !sample?.id || !version?.id) {
-    return null;
+    throw new Error("方案已生成，但缺少后端地址或方案版本信息，无法同步到全局方案库。");
   }
   const response = await fetch(`${apiBaseUrl}/api/v1/projects/${encodeURIComponent(sample.id)}/versions`, {
     method: "POST",
@@ -3754,7 +4352,9 @@ function renderFloorPreview(drawing, fileName) {
     fill: "#fbfbf6",
   }));
 
-  drawing.polylines.forEach((polyline) => {
+  const visibleBounds = getPreviewVisibleDataBounds(drawing.bounds);
+
+  drawing.polylines.filter((polyline) => isDrawingPolylineVisible(polyline, visibleBounds)).forEach((polyline) => {
     const points = polyline.points.map((point) => projectFloorPoint(point, drawing.bounds)).join(" ");
     svg.append(createSvgElement(polyline.closed ? "polygon" : "polyline", {
       points,
@@ -3767,7 +4367,7 @@ function renderFloorPreview(drawing, fileName) {
     }));
   });
 
-  drawing.circles.forEach((circle) => {
+  drawing.circles.filter((circle) => isDrawingCircleVisible(circle, visibleBounds)).forEach((circle) => {
     const center = projectFloorPointObject(circle.center, drawing.bounds);
     svg.append(createSvgElement("circle", {
       cx: center.x,
@@ -3780,7 +4380,7 @@ function renderFloorPreview(drawing, fileName) {
     }));
   });
 
-  drawing.lines.forEach((line) => {
+  drawing.lines.filter((line) => isDrawingLineVisible(line, visibleBounds)).forEach((line) => {
     const start = projectFloorPointObject(line.start, drawing.bounds);
     const end = projectFloorPointObject(line.end, drawing.bounds);
     svg.append(createSvgElement("line", {
@@ -3795,7 +4395,7 @@ function renderFloorPreview(drawing, fileName) {
     }));
   });
 
-  drawing.points.forEach((point) => {
+  drawing.points.filter((point) => isPointInsideBounds(point.position, visibleBounds)).forEach((point) => {
     const projected = projectFloorPointObject(point.position, drawing.bounds);
     svg.append(createSvgElement("circle", {
       cx: projected.x,
@@ -3805,7 +4405,7 @@ function renderFloorPreview(drawing, fileName) {
     }));
   });
 
-  drawing.texts.slice(0, 80).forEach((text) => {
+  drawing.texts.filter((text) => isPointInsideBounds(text.position, visibleBounds)).slice(0, 80).forEach((text) => {
     const projected = projectFloorPointObject(text.position, drawing.bounds);
     const label = createSvgElement("text", {
       x: projected.x,
@@ -3880,6 +4480,35 @@ function floorPreviewStrokeWidth(role) {
   return 1.5;
 }
 
+function getPreviewVisibleDataBounds(bounds) {
+  const width = Math.max(bounds.maxX - bounds.minX, 1);
+  const height = Math.max(bounds.maxY - bounds.minY, 1);
+  const padding = Math.max(width, height) * floorPreviewVisibleBoundsPaddingRatio;
+  return {
+    minX: bounds.minX - padding,
+    minY: bounds.minY - padding,
+    maxX: bounds.maxX + padding,
+    maxY: bounds.maxY + padding,
+  };
+}
+
+function isDrawingLineVisible(line, bounds) {
+  return doBoundsIntersect(getPointBounds([line.start, line.end]), bounds);
+}
+
+function isDrawingPolylineVisible(polyline, bounds) {
+  return doBoundsIntersect(getPointBounds(polyline.points), bounds);
+}
+
+function isDrawingCircleVisible(circle, bounds) {
+  return doBoundsIntersect({
+    minX: circle.center.x - circle.radius,
+    minY: circle.center.y - circle.radius,
+    maxX: circle.center.x + circle.radius,
+    maxY: circle.center.y + circle.radius,
+  }, bounds);
+}
+
 function createFloorPlanImage(floorPlan, fileName) {
   const drawing = buildDrawingFromFloorPlan(floorPlan);
   if (!drawing?.bounds || drawing.stats.drawableCount === 0) {
@@ -3897,31 +4526,33 @@ function createFloorPlanImage(floorPlan, fileName) {
     `<rect width="${floorPreviewWidth}" height="${floorPreviewHeight}" fill="#fbfbf6"/>`,
   ];
 
-  drawing.polylines.forEach((polyline) => {
+  const visibleBounds = getPreviewVisibleDataBounds(drawing.bounds);
+
+  drawing.polylines.filter((polyline) => isDrawingPolylineVisible(polyline, visibleBounds)).forEach((polyline) => {
     const points = polyline.points.map((point) => projectFloorPoint(point, drawing.bounds)).join(" ");
     const tagName = polyline.closed ? "polygon" : "polyline";
     const fill = polyline.closed && polyline.role === "room_boundary" ? "rgb(94 154 135 / 0.08)" : "none";
     parts.push(`<${tagName} points="${points}" fill="${fill}" stroke="${floorPreviewColor(polyline.role)}" stroke-width="${floorPreviewStrokeWidth(polyline.role)}" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`);
   });
 
-  drawing.circles.forEach((circle) => {
+  drawing.circles.filter((circle) => isDrawingCircleVisible(circle, visibleBounds)).forEach((circle) => {
     const center = projectFloorPointObject(circle.center, drawing.bounds);
     const radius = Math.max(2, circle.radius * drawing.bounds.scale);
     parts.push(`<circle cx="${center.x}" cy="${center.y}" r="${radius}" fill="none" stroke="${floorPreviewColor(circle.role)}" stroke-width="${floorPreviewStrokeWidth(circle.role)}" vector-effect="non-scaling-stroke"/>`);
   });
 
-  drawing.lines.forEach((line) => {
+  drawing.lines.filter((line) => isDrawingLineVisible(line, visibleBounds)).forEach((line) => {
     const start = projectFloorPointObject(line.start, drawing.bounds);
     const end = projectFloorPointObject(line.end, drawing.bounds);
     parts.push(`<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${floorPreviewColor(line.role)}" stroke-width="${floorPreviewStrokeWidth(line.role)}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`);
   });
 
-  drawing.points.forEach((point) => {
+  drawing.points.filter((point) => isPointInsideBounds(point.position, visibleBounds)).forEach((point) => {
     const projected = projectFloorPointObject(point.position, drawing.bounds);
     parts.push(`<circle cx="${projected.x}" cy="${projected.y}" r="5" fill="${floorPreviewColor(point.role)}"/>`);
   });
 
-  drawing.texts.slice(0, 80).forEach((text) => {
+  drawing.texts.filter((text) => isPointInsideBounds(text.position, visibleBounds)).slice(0, 80).forEach((text) => {
     const projected = projectFloorPointObject(text.position, drawing.bounds);
     parts.push(`<text x="${projected.x}" y="${projected.y}" fill="${floorPreviewColor(text.role)}" font-size="18" font-weight="700">${escapeSvgText(text.text)}</text>`);
   });
@@ -4058,10 +4689,26 @@ function addDrawingPoint(drawing, position, role, layer) {
 }
 
 function addDrawingText(drawing, position, text, role, layer) {
-  if (!isPoint(position) || !text) {
+  if (!isPoint(position) || role !== "room_text") {
     return;
   }
-  drawing.texts.push({ position: normalizePoint(position), text, role, layer });
+  const label = cleanDxfRoomText(text);
+  if (!label) {
+    return;
+  }
+  drawing.texts.push({ position: normalizePoint(position), text: label, role, layer });
+}
+
+function cleanDxfRoomText(value) {
+  return String(value ?? "")
+    .replace(/\\P/g, " ")
+    .replace(/\\~/g, " ")
+    .replace(/\\[A-Za-z]+[^;]*;/g, "")
+    .replace(/\\[A-Za-z]+/g, "")
+    .replace(/[{}]/g, "")
+    .replace(/;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function finalizeDrawing(drawing) {
@@ -4104,14 +4751,16 @@ function finalizeDrawing(drawing) {
 }
 
 function getDrawingBoundsPoints(drawing) {
-  const primaryGeometry = collectDrawingGeometryPoints(drawing, (role) => floorPlanGeometryRoles.has(role));
-  if (primaryGeometry.length > 0) {
-    return primaryGeometry;
+  for (const roleSet of floorPreviewBoundsRolePriority) {
+    const geometryItems = collectDrawingGeometryItems(drawing, (role) => roleSet.has(role));
+    if (geometryItems.length > 0) {
+      return focusDrawingBoundsPoints(geometryItems);
+    }
   }
 
-  const lineworkGeometry = collectDrawingGeometryPoints(drawing);
-  if (lineworkGeometry.length > 0) {
-    return lineworkGeometry;
+  const lineworkItems = collectDrawingGeometryItems(drawing);
+  if (lineworkItems.length > 0) {
+    return focusDrawingBoundsPoints(lineworkItems);
   }
 
   return [
@@ -4121,14 +4770,133 @@ function getDrawingBoundsPoints(drawing) {
 }
 
 function collectDrawingGeometryPoints(drawing, roleFilter = null) {
+  return collectDrawingGeometryItems(drawing, roleFilter).flatMap((item) => item.points);
+}
+
+function collectDrawingGeometryItems(drawing, roleFilter = null) {
   const shouldUse = (item) => !roleFilter || roleFilter(item.role);
-  return [
-    ...drawing.lines.filter(shouldUse).flatMap((line) => [line.start, line.end]),
-    ...drawing.polylines.filter(shouldUse).flatMap((polyline) => polyline.points),
-    ...drawing.circles.filter(shouldUse).flatMap((circle) => [
+  const items = [];
+
+  drawing.lines.filter(shouldUse).forEach((line) => {
+    items.push(createDrawingGeometryItem([line.start, line.end]));
+  });
+
+  drawing.polylines.filter(shouldUse).forEach((polyline) => {
+    items.push(createDrawingGeometryItem(polyline.points));
+  });
+
+  drawing.circles.filter(shouldUse).forEach((circle) => {
+    items.push(createDrawingGeometryItem([
       { x: circle.center.x - circle.radius, y: circle.center.y - circle.radius },
       { x: circle.center.x + circle.radius, y: circle.center.y + circle.radius },
-    ]),
+    ]));
+  });
+
+  return items.filter(Boolean);
+}
+
+function createDrawingGeometryItem(points) {
+  const validPoints = points.filter(isPoint);
+  if (validPoints.length === 0) {
+    return null;
+  }
+
+  const bounds = getPointBounds(validPoints);
+  return {
+    points: validPoints,
+    bounds,
+    center: {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    },
+  };
+}
+
+function focusDrawingBoundsPoints(items) {
+  const allPoints = items.flatMap((item) => item.points);
+  if (items.length < floorPreviewFocusMinItemCount || allPoints.length < floorPreviewFocusMinPointCount) {
+    return allPoints;
+  }
+
+  const overallBounds = getPointBounds(allPoints);
+  const centerBounds = getExpandedCenterBounds(items);
+  const focusedItems = items.filter((item) =>
+    isPointInsideBounds(item.center, centerBounds) || doBoundsIntersect(item.bounds, centerBounds)
+  );
+
+  if (focusedItems.length < floorPreviewFocusMinItemCount) {
+    return allPoints;
+  }
+
+  const focusedPoints = focusedItems.flatMap((item) => item.points);
+  const focusedBounds = getPointBounds(focusedPoints);
+  const overallArea = getBoundsArea(overallBounds);
+  const focusedArea = getBoundsArea(focusedBounds);
+
+  if (focusedArea <= 0 || overallArea <= 0 || focusedArea > overallArea * 0.72) {
+    return allPoints;
+  }
+
+  return getBoundsCornerPoints(focusedBounds);
+}
+
+function getExpandedCenterBounds(items) {
+  const centers = items.map((item) => item.center);
+  const minX = getSortedQuantile(centers.map((point) => point.x), floorPreviewFocusQuantile);
+  const maxX = getSortedQuantile(centers.map((point) => point.x), 1 - floorPreviewFocusQuantile);
+  const minY = getSortedQuantile(centers.map((point) => point.y), floorPreviewFocusQuantile);
+  const maxY = getSortedQuantile(centers.map((point) => point.y), 1 - floorPreviewFocusQuantile);
+  const width = Math.max(maxX - minX, 1);
+  const height = Math.max(maxY - minY, 1);
+  const padding = Math.max(width, height) * floorPreviewFocusPaddingRatio;
+
+  return [
+    { x: minX - padding, y: minY - padding },
+    { x: maxX + padding, y: maxY + padding },
+  ].reduce((bounds, point) => expandPointBounds(bounds, point), null);
+}
+
+function getPointBounds(points) {
+  return points.reduce((bounds, point) => expandPointBounds(bounds, point), null);
+}
+
+function expandPointBounds(bounds, point) {
+  if (!bounds) {
+    return { minX: point.x, minY: point.y, maxX: point.x, maxY: point.y };
+  }
+  return {
+    minX: Math.min(bounds.minX, point.x),
+    minY: Math.min(bounds.minY, point.y),
+    maxX: Math.max(bounds.maxX, point.x),
+    maxY: Math.max(bounds.maxY, point.y),
+  };
+}
+
+function getSortedQuantile(values, quantile) {
+  const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+  if (sorted.length === 0) {
+    return 0;
+  }
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * quantile)));
+  return sorted[index];
+}
+
+function isPointInsideBounds(point, bounds) {
+  return bounds.minX <= point.x && point.x <= bounds.maxX && bounds.minY <= point.y && point.y <= bounds.maxY;
+}
+
+function doBoundsIntersect(left, right) {
+  return left.minX <= right.maxX && left.maxX >= right.minX && left.minY <= right.maxY && left.maxY >= right.minY;
+}
+
+function getBoundsArea(bounds) {
+  return Math.max(bounds.maxX - bounds.minX, 1) * Math.max(bounds.maxY - bounds.minY, 1);
+}
+
+function getBoundsCornerPoints(bounds) {
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
   ];
 }
 
@@ -4205,8 +4973,16 @@ function updateGenerateState() {
   }
 }
 
+function requiresLoginForTab(tab) {
+  return tab === "platform";
+}
+
 function setTab(tab) {
   if (!canUseDesignerWorkspace && isDesignerTab(tab)) {
+    return;
+  }
+  if (requiresLoginForTab(tab) && !isAccountLoggedIn) {
+    openLoginDialog(tab);
     return;
   }
 
@@ -4220,6 +4996,10 @@ function setTab(tab) {
     const isActive = button.dataset.goTab === tab || (tab === "scheme-detail" && button.dataset.goTab === "samples");
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-current", isActive ? "page" : "false");
+  });
+
+  navGroups.forEach((group) => {
+    group.classList.toggle("is-active", Boolean(group.querySelector(".is-active")));
   });
 
   window.scrollTo({ top: 0, left: 0 });
@@ -4262,12 +5042,12 @@ function renderSampleList() {
     addButton.className = "project-card add-project-card";
     addButton.innerHTML = `
       <span class="project-thumb add-project-thumb">
-        <img src="./assets/showcase/new-plan-cover.jpg" alt="新建方案图纸与材质工作台" loading="lazy" />
+        <img src="./assets/showcase/new-plan-cover-cream.jpg" alt="新方案图纸与奶油风材质工作台" loading="lazy" />
       </span>
       <span class="project-body new-plan-body">
         <span class="project-eyebrow">开始</span>
         <span class="project-title-line">
-          <strong>新建方案</strong>
+          <strong>新方案</strong>
           <small>导入图纸</small>
         </span>
         <span class="project-meta" aria-label="创建流程">
@@ -4355,7 +5135,7 @@ function renderStyleList() {
         const sceneId = getPreviewScenes(sample)[0]?.id || sample.rooms[0]?.id || "";
         const vrPackage = activeVersion?.vrPackage || buildVrPackageFromScenes(sample, sample.panoramaScenes || getPreviewScenes(sample), activeVersion?.id || "");
         renderStyleList();
-        openPanoramaViewer(vrPackage, sceneId);
+        openPanoramaViewer(vrPackage, sceneId, activeVersion?.renderSpec || sample?.draft?.render_spec || null);
       });
       return button;
     })
@@ -4516,7 +5296,7 @@ function getActiveAdjustScene(sample) {
 
 function getSampleCoverScene(sample) {
   return getPreviewScenes(sample)[0] ?? {
-    image: "./assets/showcase/new-plan-cover.jpg",
+    image: "./assets/showcase/new-plan-cover-cream.jpg",
     alt: "方案预览",
   };
 }
@@ -4596,6 +5376,7 @@ function renderPreviewVr(sample, activeVersion, fallbackRoom) {
   }
   inlineVrPreview.hidden = false;
   inlineVrScenes = scenes;
+  updateWindowVrQualityReport(buildVrQualityReport(inlineVrScenes));
   if (!inlineVrScenes.some((scene) => scene.id === activeInlineVrSceneId)) {
     activeInlineVrSceneId = inlineVrScenes[0].id;
     resetInlineVrViewState();
@@ -4615,7 +5396,7 @@ function renderInlineVrViewer(sample, activeVersion) {
   const vrPackage = activeVersion?.vrPackage || buildVrPackageFromScenes(sample, activeVersion?.scenes || inlineVrScenes, activeVersion?.id || "");
   if (inlineVrStatus) {
     const qualityPrefix = isDeliverableVrPackage(vrPackage) ? "可交付全屋 VR" : isRealPanoramaPackage(vrPackage) ? "可查看全屋 VR" : "全景草稿";
-    inlineVrStatus.textContent = `${qualityPrefix} · ${inlineVrScenes.length} 个空间`;
+    inlineVrStatus.textContent = `${qualityPrefix} · ${inlineVrScenes.length} 个空间 · ${getSceneVrQualityReport(scene).label}`;
   }
   loadInlineVrTexture(scene.image);
   renderInlineVrHotspots(scene);
@@ -4632,7 +5413,7 @@ function renderInlineVrTabs(activeScene) {
       button.type = "button";
       button.className = scene.id === activeScene.id ? "is-active" : "";
       const thumb = document.createElement("img");
-      thumb.src = scene.preview || scene.image;
+      thumb.src = scene.poster || scene.preview || scene.image;
       thumb.alt = "";
       const label = document.createElement("span");
       label.textContent = scene.name;
@@ -4647,24 +5428,7 @@ function renderInlineVrHotspots(activeScene) {
   if (!inlineVrHotspots) {
     return;
   }
-  inlineVrHotspots.replaceChildren(
-    ...inlineVrScenes
-      .filter((scene) => scene.id !== activeScene.id)
-      .map((scene, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "vr-hotspot";
-        button.dataset.sceneId = scene.id;
-        button.dataset.yaw = String(panoramaHotspotYawForScene(scene, index, inlineVrScenes.length - 1));
-        button.textContent = formatVrHotspotLabel(scene);
-        button.addEventListener("pointerdown", (event) => event.stopPropagation());
-        button.addEventListener("click", (event) => {
-          event.stopPropagation();
-          switchInlineVrScene(scene.id);
-        });
-        return button;
-      })
-  );
+  inlineVrHotspots.replaceChildren();
   updateInlineVrOverlayPositions();
 }
 
@@ -4672,7 +5436,7 @@ function openInlineVrFullscreen() {
   const sample = getActiveSample();
   const activeVersion = sample ? getActiveVersion(sample) : null;
   const vrPackage = activeVersion?.vrPackage || buildVrPackageFromScenes(sample, activeVersion?.scenes || inlineVrScenes, activeVersion?.id || "");
-  openPanoramaViewer(vrPackage, activeInlineVrSceneId || vrPackage.scenes?.[0]?.id);
+  openPanoramaViewer(vrPackage, activeInlineVrSceneId || vrPackage.scenes?.[0]?.id, activeVersion?.renderSpec || sample?.draft?.render_spec || null);
 }
 
 function switchInlineVrScene(sceneId) {
@@ -4764,7 +5528,7 @@ function handleInlineVrPointerUp(event) {
 
 function handleInlineVrWheel(event) {
   event.preventDefault();
-  inlineVrFov = Math.max(42, Math.min(88, inlineVrFov + Math.sign(event.deltaY) * 4));
+  inlineVrFov = clampVrFov(inlineVrFov + Math.sign(event.deltaY) * vrWheelFovStep);
 }
 
 function resetInlineVrView() {
@@ -4775,7 +5539,7 @@ function resetInlineVrView() {
 function resetInlineVrViewState() {
   inlineVrYaw = 0;
   inlineVrPitch = 0;
-  inlineVrFov = 72;
+  inlineVrFov = vrDefaultFov;
 }
 
 function toggleInlineVrAutoRotate() {
@@ -4832,7 +5596,7 @@ function drawInlineVrFrame() {
   gl.uniform1i(state.sampler, 0);
   gl.uniform1f(state.yaw, inlineVrYaw);
   gl.uniform1f(state.pitch, inlineVrPitch);
-  gl.uniform1f(state.fov, inlineVrFov);
+  gl.uniform1f(state.fov, horizontalFovToVerticalFov(inlineVrFov, width / height));
   gl.uniform1f(state.aspect, width / height);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
@@ -4847,9 +5611,10 @@ function updateInlineVrOverlayPositions() {
     const visibleLimit = Math.PI * 0.34;
     const visible = Math.abs(diff) < visibleLimit;
     const x = 50 + (diff / visibleLimit) * 42;
-    const y = 54 + Math.sin(diff * 1.4) * 8 + inlineVrPitch * 18;
+    const baseY = button.dataset.anchor === "door_floor" ? 74 : 56;
+    const y = baseY + Math.sin(diff * 1.2) * 4 + inlineVrPitch * 18;
     button.style.left = `${Math.max(8, Math.min(92, x))}%`;
-    button.style.top = `${Math.max(18, Math.min(82, y))}%`;
+    button.style.top = `${Math.max(24, Math.min(86, y))}%`;
     button.style.opacity = visible ? "1" : "0";
     button.style.pointerEvents = visible ? "auto" : "none";
   });
@@ -5028,13 +5793,21 @@ function ensurePanoramaViewer() {
   panoramaViewer.hidden = true;
   panoramaViewer.innerHTML = `
     <section class="vr-viewer-sheet" aria-label="VR 全景查看">
+      <header class="vr-viewer-meta" aria-label="项目信息">
+        <span data-vr-viewer-project></span>
+        <strong data-vr-viewer-title></strong>
+        <small data-vr-viewer-status></small>
+      </header>
       <div class="vr-viewer-stage" data-vr-viewer-stage>
         <canvas data-vr-viewer-canvas aria-label="VR 全景画面"></canvas>
+        <div class="vr-photo-sphere-stage" data-vr-photo-sphere-stage hidden></div>
         <div class="vr-viewer-hotspots" data-vr-viewer-hotspots></div>
+        <aside class="vr-viewer-map" data-vr-viewer-map aria-label="全屋地图"></aside>
       </div>
       <nav class="vr-viewer-actions" aria-label="VR 工具">
         <button type="button" data-vr-viewer-auto>旋转</button>
         <button type="button" data-vr-viewer-reset>复位</button>
+        <button type="button" data-vr-viewer-map-toggle aria-pressed="true">地图</button>
         <button type="button" data-vr-viewer-close>退出</button>
       </nav>
       <button class="vr-viewer-scenes-toggle" type="button" data-vr-viewer-scenes-toggle aria-expanded="false">展开场景</button>
@@ -5049,6 +5822,8 @@ function ensurePanoramaViewer() {
   panoramaViewerHotspots = panoramaViewer.querySelector("[data-vr-viewer-hotspots]");
   panoramaViewerMap = panoramaViewer.querySelector("[data-vr-viewer-map]");
   panoramaViewerAutoButton = panoramaViewer.querySelector("[data-vr-viewer-auto]");
+  panoramaViewerMapToggleButton = panoramaViewer.querySelector("[data-vr-viewer-map-toggle]");
+  panoramaPhotoSphereStage = panoramaViewer.querySelector("[data-vr-photo-sphere-stage]");
   panoramaViewerScenesToggleButton = panoramaViewer.querySelector("[data-vr-viewer-scenes-toggle]");
   const stage = panoramaViewer.querySelector("[data-vr-viewer-stage]");
 
@@ -5060,6 +5835,7 @@ function ensurePanoramaViewer() {
   panoramaViewer.querySelector("[data-vr-viewer-close]")?.addEventListener("click", closePanoramaViewer);
   panoramaViewer.querySelector("[data-vr-viewer-reset]")?.addEventListener("click", resetPanoramaView);
   panoramaViewer.querySelector("[data-vr-viewer-auto]")?.addEventListener("click", togglePanoramaAutoRotate);
+  panoramaViewerMapToggleButton?.addEventListener("click", togglePanoramaMap);
   panoramaViewerScenesToggleButton?.addEventListener("click", togglePanoramaSceneStrip);
   stage?.addEventListener("pointerdown", handlePanoramaPointerDown);
   stage?.addEventListener("pointermove", handlePanoramaPointerMove);
@@ -5070,34 +5846,50 @@ function ensurePanoramaViewer() {
   document.body.append(panoramaViewer);
 }
 
-function openPanoramaViewer(vrPackageOrScenes, sceneId) {
+function openPanoramaViewer(vrPackageOrScenes, sceneId, renderSpec = null) {
   ensurePanoramaViewer();
+  const sample = getActiveSample();
+  const activeVersion = sample ? getActiveVersion(sample) : null;
   const scenes = Array.isArray(vrPackageOrScenes)
     ? vrPackageOrScenes
     : vrPackageOrScenes?.scenes || [];
   panoramaViewerMapPoints = Array.isArray(vrPackageOrScenes)
     ? []
     : vrPackageOrScenes?.floorMapPoints || [];
+  panoramaViewerRenderSpec = renderSpec || vrPackageOrScenes?.renderSpec || vrPackageOrScenes?.render_spec || activeVersion?.renderSpec || sample?.draft?.render_spec || null;
+  panoramaViewerFloorPlan = vrPackageOrScenes?.floorPlan || vrPackageOrScenes?.floor_plan || activeVersion?.floorPlan || activeVersion?.floor_plan || sample?.draft?.floor_plan || null;
+  panoramaViewerFloorPlanImage = getPreviewFloorPlanImage(sample, activeVersion);
   panoramaViewerScenes = scenes
     .filter((scene) => (scene.shot_type === "panorama" || scene.projection === "equirectangular") && (scene.image || scene.panorama_url))
     .map((scene) => ({
       ...scene,
       id: scene.sceneId || scene.scene_id || scene.id,
       image: scene.image || scene.panorama_url,
-      preview: scene.preview || scene.thumb_url || scene.panorama_url || scene.image,
+      preview: scene.preview || scene.thumb_url || scene.poster || scene.poster_url || scene.panorama_url || scene.image,
+      poster: scene.poster || scene.poster_url || scene.preview || scene.thumb_url || scene.panorama_url || scene.image,
       name: scene.name || formatVrPanoramaSceneName(scene),
       shot_type: "panorama",
     }));
   if (!panoramaViewerScenes.length) {
     return;
   }
+  updateWindowVrQualityReport(buildVrQualityReport(panoramaViewerScenes));
+  panoramaViewerEngine = getRequestedVrViewerEngine();
   activePanoramaSceneId = panoramaViewerScenes.some((scene) => scene.id === sceneId)
     ? sceneId
     : panoramaViewerScenes[0].id;
   panoramaViewerScenesExpanded = false;
   resetPanoramaViewState();
-  renderPanoramaViewer();
+  panoramaViewer.classList.toggle("is-photo-sphere", panoramaViewerEngine === "photoSphere");
+  panoramaViewer.removeAttribute("data-vr-engine-error");
+  panoramaViewer.classList.remove("is-map-hidden");
+  panoramaViewerMapToggleButton?.setAttribute("aria-pressed", "true");
+  panoramaViewerMapToggleButton?.classList.add("is-active");
+  if (panoramaViewerMap) {
+    panoramaViewerMap.hidden = false;
+  }
   panoramaViewer.hidden = false;
+  renderPanoramaViewer();
   panoramaViewer.classList.toggle("is-multi-scene", panoramaViewerScenes.length > 1);
   updatePanoramaSceneStripState();
   startPanoramaRenderLoop();
@@ -5111,12 +5903,24 @@ function closePanoramaViewer() {
     updatePanoramaSceneStripState();
   }
   panoramaDragState = null;
+  panoramaPhotoSphereRequestId += 1;
+  destroyPhotoSphereViewer();
   stopPanoramaRenderLoop();
 }
 
 function togglePanoramaSceneStrip() {
   panoramaViewerScenesExpanded = !panoramaViewerScenesExpanded;
   updatePanoramaSceneStripState();
+}
+
+function togglePanoramaMap() {
+  const hidden = !panoramaViewer?.classList.contains("is-map-hidden");
+  panoramaViewer?.classList.toggle("is-map-hidden", hidden);
+  if (panoramaViewerMap) {
+    panoramaViewerMap.hidden = hidden;
+  }
+  panoramaViewerMapToggleButton?.setAttribute("aria-pressed", String(!hidden));
+  panoramaViewerMapToggleButton?.classList.toggle("is-active", !hidden);
 }
 
 function updatePanoramaSceneStripState() {
@@ -5140,18 +5944,19 @@ function renderPanoramaViewer() {
   const vrPackage = activeVersion?.vrPackage || buildVrPackageFromScenes(sample, activeVersion?.scenes || panoramaViewerScenes, activeVersion?.id || "");
   const packageDeliverable = isDeliverableVrPackage(vrPackage);
   if (panoramaViewerProject) {
-    panoramaViewerProject.textContent = `${sample.name} · ${sample.style} · 第 ${sample.versions?.length || 1} 版`;
+    panoramaViewerProject.textContent = "";
   }
   if (panoramaViewerTitle) {
-    panoramaViewerTitle.textContent = scene.name;
+    panoramaViewerTitle.textContent = "";
   }
   const qualityPrefix = packageDeliverable ? "可交付" : isRealPanoramaPackage(vrPackage) ? "可查看" : "草稿校验";
+  const sceneQuality = getSceneVrQualityReport(scene);
   if (panoramaViewerStatus) {
     panoramaViewerStatus.textContent = panoramaViewerScenes.length > 1
-      ? `${qualityPrefix} · ${panoramaViewerScenes.length} 个空间点位`
-      : qualityPrefix;
+      ? `${qualityPrefix} · ${panoramaViewerScenes.length} 个空间 · ${sceneQuality.label}`
+      : `${qualityPrefix} · ${sceneQuality.label}`;
   }
-  loadPanoramaTexture(scene.image);
+  renderPanoramaSceneImage(scene);
   renderPanoramaHotspots(scene);
   renderPanoramaMap(scene);
   if (!panoramaViewerSceneTabs) {
@@ -5161,9 +5966,13 @@ function renderPanoramaViewer() {
     ...panoramaViewerScenes.map((item) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = item.id === scene.id ? "is-active" : "";
+      const quality = getSceneVrQualityReport(item);
+      button.className = [
+        item.id === scene.id ? "is-active" : "",
+        quality.status === "review_required" ? "is-low-quality" : "",
+      ].filter(Boolean).join(" ");
       const thumb = document.createElement("img");
-      thumb.src = item.preview || item.image;
+      thumb.src = item.poster || item.preview || item.image;
       thumb.alt = "";
       const label = document.createElement("span");
       label.textContent = item.name;
@@ -5176,6 +5985,111 @@ function renderPanoramaViewer() {
       return button;
     })
   );
+}
+
+function renderPanoramaSceneImage(scene) {
+  if (panoramaViewerEngine === "photoSphere") {
+    renderPhotoSphereScene(scene);
+    return;
+  }
+  panoramaPhotoSphereRequestId += 1;
+  destroyPhotoSphereViewer();
+  panoramaViewer?.classList.remove("is-photo-sphere");
+  if (panoramaPhotoSphereStage) {
+    panoramaPhotoSphereStage.hidden = true;
+  }
+  if (panoramaViewerCanvas) {
+    panoramaViewerCanvas.hidden = false;
+  }
+  loadPanoramaTexture(scene.image);
+}
+
+async function renderPhotoSphereScene(scene) {
+  if (!panoramaPhotoSphereStage || !panoramaViewerCanvas) {
+    loadPanoramaTexture(scene.image);
+    return;
+  }
+  const requestId = panoramaPhotoSphereRequestId + 1;
+  panoramaPhotoSphereRequestId = requestId;
+  panoramaViewer?.classList.add("is-photo-sphere");
+  panoramaPhotoSphereStage.hidden = false;
+  panoramaViewerCanvas.hidden = true;
+  try {
+    const module = await loadPhotoSphereModule();
+    if (requestId !== panoramaPhotoSphereRequestId || panoramaViewer?.hidden) {
+      return;
+    }
+    const Viewer = module.Viewer || module.PhotoSphereViewer;
+    if (!Viewer) {
+      throw new Error("Photo Sphere Viewer module does not export Viewer.");
+    }
+    destroyPhotoSphereViewer();
+    panoramaPhotoSphereViewer = new Viewer({
+      container: panoramaPhotoSphereStage,
+      panorama: scene.image,
+      caption: scene.name,
+      navbar: false,
+      mousewheel: true,
+      touchmoveTwoFingers: false,
+      defaultZoomLvl: 50,
+      loadingImg: scene.poster || scene.preview || "",
+    });
+    if (panoramaAutoRotate) {
+      syncPhotoSphereAutorotate();
+    }
+  } catch (error) {
+    if (requestId !== panoramaPhotoSphereRequestId || panoramaViewer?.hidden) {
+      return;
+    }
+    console.warn("Photo Sphere Viewer failed, falling back to legacy viewer.", error);
+    panoramaViewer?.setAttribute("data-vr-engine-error", error?.message || "unknown");
+    panoramaViewerEngine = "legacy";
+    panoramaViewer?.classList.remove("is-photo-sphere");
+    panoramaPhotoSphereStage.hidden = true;
+    panoramaViewerCanvas.hidden = false;
+    loadPanoramaTexture(scene.image);
+    if (panoramaViewerStatus) {
+      panoramaViewerStatus.textContent = "Photo Sphere 加载失败，已切回基础查看器。";
+    }
+  }
+}
+
+function destroyPhotoSphereViewer() {
+  if (!panoramaPhotoSphereViewer) {
+    return;
+  }
+  try {
+    panoramaPhotoSphereViewer.destroy?.();
+  } catch (error) {
+    console.warn("Failed to destroy Photo Sphere Viewer.", error);
+  }
+  panoramaPhotoSphereViewer = null;
+  if (panoramaPhotoSphereStage) {
+    panoramaPhotoSphereStage.replaceChildren();
+  }
+}
+
+function syncPhotoSphereAutorotate() {
+  if (!panoramaPhotoSphereViewer) {
+    return;
+  }
+  if (panoramaAutoRotate) {
+    panoramaPhotoSphereViewer.startAutorotate?.();
+  } else {
+    panoramaPhotoSphereViewer.stopAutorotate?.();
+  }
+}
+
+function tickPhotoSphereAutorotate(delta) {
+  if (!panoramaPhotoSphereViewer || !panoramaAutoRotate || panoramaDragState) {
+    return;
+  }
+  const currentPosition = panoramaPhotoSphereViewer.getPosition?.() || { yaw: panoramaYaw, pitch: panoramaPitch };
+  const nextYaw = normalizePanoramaAngle((Number(currentPosition.yaw) || 0) + delta * 0.18);
+  const nextPitch = Number(currentPosition.pitch) || 0;
+  panoramaPhotoSphereViewer.rotate?.({ yaw: nextYaw, pitch: nextPitch });
+  panoramaYaw = nextYaw;
+  panoramaPitch = nextPitch;
 }
 
 function handlePanoramaPointerDown(event) {
@@ -5207,23 +6121,39 @@ function handlePanoramaPointerUp(event) {
 
 function handlePanoramaWheel(event) {
   event.preventDefault();
-  panoramaFov = Math.max(42, Math.min(88, panoramaFov + Math.sign(event.deltaY) * 4));
+  panoramaFov = clampVrFov(panoramaFov + Math.sign(event.deltaY) * vrWheelFovStep);
 }
 
 function resetPanoramaView() {
   resetPanoramaViewState();
+  if (panoramaPhotoSphereViewer) {
+    panoramaPhotoSphereViewer.rotate?.({ yaw: 0, pitch: 0 });
+    panoramaPhotoSphereViewer.zoom?.(50);
+  }
   updatePanoramaOverlayPositions();
 }
 
 function resetPanoramaViewState() {
   panoramaYaw = 0;
   panoramaPitch = 0;
-  panoramaFov = 72;
+  panoramaFov = vrDefaultFov;
+}
+
+function clampVrFov(value) {
+  return Math.max(vrMinFov, Math.min(vrMaxFov, value));
+}
+
+function horizontalFovToVerticalFov(horizontalFov, aspect) {
+  const safeAspect = Math.max(Number(aspect) || 1, 0.1);
+  const horizontalRadians = degreesToRadians(clampVrFov(horizontalFov));
+  const verticalRadians = 2 * Math.atan(Math.tan(horizontalRadians / 2) / safeAspect);
+  return Math.max(1, Math.min(120, (verticalRadians * 180) / Math.PI));
 }
 
 function togglePanoramaAutoRotate(event) {
   panoramaAutoRotate = !panoramaAutoRotate;
   event.currentTarget.classList.toggle("is-active", panoramaAutoRotate);
+  syncPhotoSphereAutorotate();
 }
 
 async function copyPanoramaShareLink() {
@@ -5358,7 +6288,9 @@ function startPanoramaRenderLoop() {
   const tick = (time) => {
     const delta = Math.min((time - panoramaLastFrameTime) / 1000, 0.05);
     panoramaLastFrameTime = time;
-    if (panoramaAutoRotate && !panoramaDragState) {
+    if (panoramaViewerEngine === "photoSphere" && panoramaPhotoSphereViewer) {
+      tickPhotoSphereAutorotate(delta);
+    } else if (panoramaAutoRotate && !panoramaDragState) {
       panoramaYaw += delta * 0.18;
       updatePanoramaOverlayPositions();
     }
@@ -5376,6 +6308,9 @@ function stopPanoramaRenderLoop() {
 }
 
 function drawPanoramaFrame() {
+  if (panoramaViewerEngine === "photoSphere" && panoramaPhotoSphereViewer) {
+    return;
+  }
   const state = getPanoramaGlState();
   if (!state || !state.hasTexture || !panoramaViewerCanvas) {
     return;
@@ -5399,7 +6334,7 @@ function drawPanoramaFrame() {
   gl.uniform1i(state.sampler, 0);
   gl.uniform1f(state.yaw, panoramaYaw);
   gl.uniform1f(state.pitch, panoramaPitch);
-  gl.uniform1f(state.fov, panoramaFov);
+  gl.uniform1f(state.fov, horizontalFovToVerticalFov(panoramaFov, width / height));
   gl.uniform1f(state.aspect, width / height);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
@@ -5408,37 +6343,22 @@ function renderPanoramaHotspots(activeScene) {
   if (!panoramaViewerHotspots) {
     return;
   }
-  panoramaViewerHotspots.replaceChildren(
-    ...(activeScene.hotspots?.length
-      ? activeScene.hotspots
-          .map((hotspot, index) => {
-            const targetSceneId = hotspot.targetSceneId || hotspot.target_scene_id;
-            const scene = panoramaViewerScenes.find((item) => item.id === targetSceneId);
-            return scene ? { scene, yaw: degreesToRadians(Number(hotspot.yaw) || panoramaHotspotYaw(index, activeScene.hotspots.length)) } : null;
-          })
-          .filter(Boolean)
-      : panoramaViewerScenes
-          .filter((scene) => scene.id !== activeScene.id)
-          .map((scene, index) => ({ scene, yaw: panoramaHotspotYawForScene(scene, index, panoramaViewerScenes.length - 1) }))
-    )
-      .map(({ scene, yaw }) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "vr-hotspot";
-        button.dataset.sceneId = scene.id;
-        button.dataset.yaw = String(yaw);
-        button.textContent = formatVrHotspotLabel(scene);
-        button.addEventListener("pointerdown", (event) => event.stopPropagation());
-        button.addEventListener("click", (event) => {
-          event.stopPropagation();
-          activePanoramaSceneId = scene.id;
-          resetPanoramaViewState();
-          renderPanoramaViewer();
-        });
-        return button;
-      })
-  );
+  panoramaViewerHotspots.replaceChildren();
   updatePanoramaOverlayPositions();
+}
+
+function resolveVrHotspotTargets(activeScene, scenes) {
+  return [];
+}
+
+function hotspotYawRadians(hotspot, index, count) {
+  const yaw = Number(hotspot.yaw ?? hotspot.yaw_degrees ?? hotspot.yawDegrees);
+  return Number.isFinite(yaw) ? degreesToRadians(yaw) : panoramaHotspotYaw(index, count);
+}
+
+function hotspotPitchRadians(hotspot) {
+  const pitch = Number(hotspot.pitch ?? hotspot.pitch_degrees ?? hotspot.pitchDegrees);
+  return Number.isFinite(pitch) ? degreesToRadians(pitch) : degreesToRadians(-18);
 }
 
 function degreesToRadians(value) {
@@ -5489,9 +6409,10 @@ function updatePanoramaOverlayPositions() {
     const visibleLimit = Math.PI * 0.34;
     const visible = Math.abs(diff) < visibleLimit;
     const x = 50 + (diff / visibleLimit) * 42;
-    const y = 54 + Math.sin(diff * 1.4) * 8 + panoramaPitch * 18;
+    const baseY = button.dataset.anchor === "door_floor" ? 74 : 56;
+    const y = baseY + Math.sin(diff * 1.2) * 4 + panoramaPitch * 18;
     button.style.left = `${Math.max(8, Math.min(92, x))}%`;
-    button.style.top = `${Math.max(18, Math.min(82, y))}%`;
+    button.style.top = `${Math.max(24, Math.min(86, y))}%`;
     button.style.opacity = visible ? "1" : "0";
     button.style.pointerEvents = visible ? "auto" : "none";
   });
@@ -5501,24 +6422,302 @@ function renderPanoramaMap(activeScene) {
   if (!panoramaViewerMap) {
     return;
   }
-  panoramaViewerMap.replaceChildren(
-    ...panoramaViewerScenes.map((scene, index) => {
-      const point = panoramaViewerMapPoints.find((item) => (item.sceneId || item.scene_id) === scene.id) || panoramaMapPoint(index, panoramaViewerScenes.length);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = scene.id === activeScene.id ? "is-active" : "";
-      button.style.left = `${point.x}%`;
-      button.style.top = `${point.y}%`;
-      button.textContent = String(index + 1);
-      button.title = scene.name;
-      button.addEventListener("click", () => {
-        activePanoramaSceneId = scene.id;
-        resetPanoramaViewState();
-        renderPanoramaViewer();
-      });
-      return button;
-    })
-  );
+  const title = document.createElement("strong");
+  title.textContent = "全屋地图";
+  const mapBody = document.createElement("div");
+  mapBody.className = "vr-viewer-map-body";
+  mapBody.innerHTML = createPanoramaMinimapSvg();
+  panoramaViewerScenes.forEach((scene, index) => {
+    const point = getPanoramaSceneMapPoint(scene, index);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = scene.id === activeScene?.id ? "is-active" : "";
+    button.style.left = `${point.x}%`;
+    button.style.top = `${point.y}%`;
+    button.setAttribute("aria-label", `切换到${scene.name}`);
+    button.title = scene.name;
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("pointermove", (event) => event.stopPropagation());
+    button.addEventListener("pointerup", (event) => event.stopPropagation());
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (activePanoramaSceneId === scene.id) {
+        return;
+      }
+      activePanoramaSceneId = scene.id;
+      resetPanoramaViewState();
+      renderPanoramaViewer();
+    });
+    mapBody.append(button);
+  });
+  panoramaViewerMap.replaceChildren(title, mapBody);
+}
+
+function createPanoramaMinimapSvg() {
+  const floorPlanSvg = createFloorPlanMinimapSvg();
+  if (floorPlanSvg) {
+    return floorPlanSvg;
+  }
+  const floorPlanImageSvg = createFloorPlanImageMinimapSvg();
+  if (floorPlanImageSvg) {
+    return floorPlanImageSvg;
+  }
+  const renderSpec = panoramaViewerRenderSpec;
+  const bounds = getPanoramaMinimapBounds(renderSpec);
+  if (!renderSpec || !bounds) {
+    return `<svg viewBox="0 0 ${panoramaMinimapWidth} ${panoramaMinimapHeight}" aria-hidden="true"><rect x="0" y="0" width="${panoramaMinimapWidth}" height="${panoramaMinimapHeight}" fill="none"/></svg>`;
+  }
+  const parts = [`<svg viewBox="0 0 ${panoramaMinimapWidth} ${panoramaMinimapHeight}" aria-hidden="true" preserveAspectRatio="xMidYMid meet">`];
+  (renderSpec.room_boundaries || []).forEach((boundary) => {
+    const points = (boundary.polygon || []).filter(isPoint).map((point) => projectPanoramaMapPoint(point, bounds)).map((point) => `${point.svgX},${point.svgY}`).join(" ");
+    if (points) {
+      parts.push(`<polygon points="${points}" class="mini-room"/>`);
+    }
+  });
+  (renderSpec.walls || []).forEach((wall) => {
+    if (!isPoint(wall.start) || !isPoint(wall.end)) {
+      return;
+    }
+    const start = projectPanoramaMapPoint(wall.start, bounds);
+    const end = projectPanoramaMapPoint(wall.end, bounds);
+    parts.push(`<line x1="${start.svgX}" y1="${start.svgY}" x2="${end.svgX}" y2="${end.svgY}" class="mini-wall"/>`);
+  });
+  (renderSpec.openings || []).forEach((opening) => {
+    if (!isPoint(opening.center)) {
+      return;
+    }
+    const point = projectPanoramaMapPoint(opening.center, bounds);
+    const className = opening.kind === "window" ? "mini-window" : "mini-door";
+    parts.push(`<circle cx="${point.svgX}" cy="${point.svgY}" r="${opening.kind === "window" ? 1.5 : 2.1}" class="${className}"/>`);
+  });
+  parts.push("</svg>");
+  return parts.join("");
+}
+
+function createFloorPlanImageMinimapSvg() {
+  if (!panoramaViewerFloorPlanImage) {
+    return "";
+  }
+  return [
+    `<svg viewBox="0 0 ${panoramaMinimapWidth} ${panoramaMinimapHeight}" aria-hidden="true" preserveAspectRatio="xMidYMid meet">`,
+    `<rect x="0" y="0" width="${panoramaMinimapWidth}" height="${panoramaMinimapHeight}" fill="rgb(255 253 246 / 0.10)"/>`,
+    `<image href="${escapeSvgText(panoramaViewerFloorPlanImage)}" x="0" y="0" width="${panoramaMinimapWidth}" height="${panoramaMinimapHeight}" preserveAspectRatio="xMidYMid meet" opacity="0.92"/>`,
+    "</svg>",
+  ].join("");
+}
+
+function createFloorPlanMinimapSvg() {
+  const drawing = buildDrawingFromFloorPlan(panoramaViewerFloorPlan);
+  if (!drawing?.bounds || drawing.stats.drawableCount === 0) {
+    return "";
+  }
+
+  const parts = [`<svg viewBox="0 0 ${panoramaMinimapWidth} ${panoramaMinimapHeight}" aria-hidden="true" preserveAspectRatio="xMidYMid meet">`];
+  drawing.polylines.forEach((polyline) => {
+    const points = polyline.points.map((point) => projectPanoramaMapPoint(point, drawing.bounds)).map((point) => `${point.svgX},${point.svgY}`).join(" ");
+    if (!points) {
+      return;
+    }
+    const tagName = polyline.closed ? "polygon" : "polyline";
+    const fill = polyline.closed && polyline.role === "room_boundary" ? "rgb(255 253 246 / 0.12)" : "none";
+    parts.push(`<${tagName} points="${points}" class="mini-floor-${polyline.role}" fill="${fill}"/>`);
+  });
+  drawing.lines.forEach((line) => {
+    const start = projectPanoramaMapPoint(line.start, drawing.bounds);
+    const end = projectPanoramaMapPoint(line.end, drawing.bounds);
+    parts.push(`<line x1="${start.svgX}" y1="${start.svgY}" x2="${end.svgX}" y2="${end.svgY}" class="mini-floor-${line.role}"/>`);
+  });
+  drawing.points.forEach((point) => {
+    const projected = projectPanoramaMapPoint(point.position, drawing.bounds);
+    parts.push(`<circle cx="${projected.svgX}" cy="${projected.svgY}" r="${point.role === "door" ? 1.9 : 1.5}" class="mini-floor-${point.role}"/>`);
+  });
+  parts.push("</svg>");
+  return parts.join("");
+}
+
+function getPanoramaSceneMapPoint(scene, index) {
+  const floorPlanPoint = getFloorPlanSceneMapPoint(scene);
+  if (floorPlanPoint) {
+    return floorPlanPoint;
+  }
+  const renderPoint = getRenderSpecSceneMapPoint(scene);
+  if (renderPoint) {
+    return renderPoint;
+  }
+  const point = panoramaViewerMapPoints.find((item) => {
+    const sceneId = item.sceneId || item.scene_id;
+    const roomId = item.roomId || item.room_id;
+    return sceneId === scene.id || sceneId === scene.sceneId || roomId === scene.roomId || roomId === scene.room_id;
+  });
+  return point || panoramaMapPoint(index, panoramaViewerScenes.length);
+}
+
+function getFloorPlanSceneMapPoint(scene) {
+  const drawing = buildDrawingFromFloorPlan(panoramaViewerFloorPlan);
+  const boundary = findFloorPlanMapBoundary(scene);
+  if (!drawing?.bounds || !boundary) {
+    return null;
+  }
+  const anchor = nearestFloorPlanDoorForBoundary(boundary) || boundary.center;
+  return isPoint(anchor) ? projectPanoramaMapPoint(normalizePoint(anchor), drawing.bounds) : null;
+}
+
+function findFloorPlanMapBoundary(scene) {
+  const boundaries = panoramaViewerFloorPlan?.room_boundaries || [];
+  const keys = new Set([
+    scene?.roomId,
+    scene?.room_id,
+    scene?.target_room_id,
+    scene?.id,
+    scene?.sceneId,
+    scene?.scene_id,
+    String(scene?.name || "").replace(/\s*全景$/, "").trim(),
+  ].filter(Boolean).map(String));
+  return boundaries.find((boundary) => {
+    const boundaryKeys = [boundary.id, boundary.label_id, boundary.name].filter(Boolean).map(String);
+    return boundaryKeys.some((key) => keys.has(key));
+  }) || null;
+}
+
+function nearestFloorPlanDoorForBoundary(boundary) {
+  const polygon = (boundary?.polygon || []).filter(isPoint);
+  const doors = (panoramaViewerFloorPlan?.doors || []).filter((door) => isPoint(door.center));
+  if (!polygon.length || !doors.length) {
+    return null;
+  }
+  const candidates = doors
+    .map((door) => ({ point: door.center, distance: pointPolygonDistance(door.center, polygon) }))
+    .filter((item) => item.distance <= 900);
+  return candidates.length ? candidates.sort((a, b) => a.distance - b.distance)[0].point : null;
+}
+
+function getRenderSpecSceneMapPoint(scene) {
+  const renderSpec = panoramaViewerRenderSpec;
+  const bounds = getPanoramaMinimapBounds(renderSpec);
+  const boundary = findPanoramaMapBoundary(scene);
+  if (!renderSpec || !bounds || !boundary) {
+    return null;
+  }
+  const anchor = nearestPanoramaDoorForBoundary(boundary) || boundary.center;
+  return isPoint(anchor) ? projectPanoramaMapPoint(anchor, bounds) : null;
+}
+
+function findPanoramaMapBoundary(scene) {
+  const renderSpec = panoramaViewerRenderSpec;
+  const boundaries = renderSpec?.room_boundaries || [];
+  const keys = new Set([
+    scene?.roomId,
+    scene?.room_id,
+    scene?.id,
+    scene?.sceneId,
+    scene?.scene_id,
+    String(scene?.name || "").replace(/\s*全景$/, "").trim(),
+  ].filter(Boolean).map(String));
+  return boundaries.find((boundary) => {
+    const boundaryKeys = [boundary.id, boundary.label_id, boundary.name].filter(Boolean).map(String);
+    return boundaryKeys.some((key) => keys.has(key));
+  }) || null;
+}
+
+function nearestPanoramaDoorForBoundary(boundary) {
+  const polygon = (boundary?.polygon || []).filter(isPoint);
+  const doors = (panoramaViewerRenderSpec?.openings || []).filter((opening) => opening.kind === "door" && isPoint(opening.center));
+  if (!polygon.length || !doors.length) {
+    return null;
+  }
+  const candidates = doors
+    .map((door) => ({ point: door.center, distance: pointPolygonDistance(door.center, polygon) }))
+    .filter((item) => item.distance <= 900);
+  return candidates.length ? candidates.sort((a, b) => a.distance - b.distance)[0].point : null;
+}
+
+function getPanoramaMinimapBounds(renderSpec) {
+  if (!renderSpec) {
+    return null;
+  }
+  const rawBounds = renderSpec.bounds || {};
+  const minX = Number(rawBounds.min_x);
+  const minY = Number(rawBounds.min_y);
+  const maxX = Number(rawBounds.max_x);
+  const maxY = Number(rawBounds.max_y);
+  if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+    };
+  }
+  const points = [];
+  (renderSpec.room_boundaries || []).forEach((boundary) => {
+    (boundary.polygon || []).filter(isPoint).forEach((point) => points.push(point));
+    if (isPoint(boundary.center)) points.push(boundary.center);
+  });
+  (renderSpec.walls || []).forEach((wall) => {
+    if (isPoint(wall.start)) points.push(wall.start);
+    if (isPoint(wall.end)) points.push(wall.end);
+  });
+  (renderSpec.openings || []).forEach((opening) => {
+    if (isPoint(opening.center)) points.push(opening.center);
+  });
+  if (!points.length) {
+    return null;
+  }
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+}
+
+function projectPanoramaMapPoint(point, bounds) {
+  const width = Math.max(bounds.maxX - bounds.minX, 1);
+  const height = Math.max(bounds.maxY - bounds.minY, 1);
+  const fitWidth = Math.max(panoramaMinimapWidth - panoramaMinimapPadding * 2, 1);
+  const fitHeight = Math.max(panoramaMinimapHeight - panoramaMinimapPadding * 2, 1);
+  const scale = Math.min(fitWidth / width, fitHeight / height);
+  const drawnWidth = width * scale;
+  const drawnHeight = height * scale;
+  const offsetX = (panoramaMinimapWidth - drawnWidth) / 2;
+  const offsetY = (panoramaMinimapHeight - drawnHeight) / 2;
+  const svgX = offsetX + (point.x - bounds.minX) * scale;
+  const svgY = offsetY + (bounds.maxY - point.y) * scale;
+  return {
+    svgX,
+    svgY,
+    x: Math.max(3, Math.min(97, (svgX / panoramaMinimapWidth) * 100)),
+    y: Math.max(3, Math.min(97, (svgY / panoramaMinimapHeight) * 100)),
+  };
+}
+
+function pointPolygonDistance(point, polygon) {
+  if (pointInPolygon(point, polygon)) {
+    return 0;
+  }
+  return Math.min(...polygon.map((start, index) => pointSegmentDistance(point, start, polygon[(index + 1) % polygon.length])));
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const currentPoint = polygon[index];
+    const previousPoint = polygon[previous];
+    const intersects = ((currentPoint.y > point.y) !== (previousPoint.y > point.y))
+      && (point.x < ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) / ((previousPoint.y - currentPoint.y) || 1e-9) + currentPoint.x);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
 }
 
 function panoramaMapPoint(index, count) {
