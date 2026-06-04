@@ -92,13 +92,15 @@
                     <input id="profile-avatar-input" type="url" placeholder="https://">
                   </label>
                   <div class="token-field">
-                    <span>Access Token</span>
+                    <span>群主 API Key</span>
                     <div class="token-row">
-                      <code id="profile-token">未登录</code>
-                      <button id="copy-token-button" class="copy-icon-button" type="button" aria-label="复制 Access Token" title="复制 Access Token">
+                      <code id="profile-api-key">选择群组后可生成</code>
+                      <button id="copy-api-key-button" class="copy-icon-button" type="button" aria-label="复制群主 API Key" title="复制群主 API Key" hidden>
                         <span aria-hidden="true" class="copy-icon"></span>
                       </button>
                     </div>
+                    <p id="api-key-note" class="field-hint">用于外部 API 调用。重置后旧 key 立刻失效。</p>
+                    <button id="rotate-api-key-button" class="ghost-button" type="button">生成 / 重置 API Key</button>
                   </div>
                   <div class="profile-actions">
                     <button class="secondary-button" type="submit">保存资料</button>

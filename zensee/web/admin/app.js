@@ -13,6 +13,7 @@
     startDate: "",
     endDate: "",
     selectedDate: "",
+    ownerApiKey: "",
     statusFilter: "all",
     memberSort: "status",
     memberSearch: ""
@@ -42,8 +43,10 @@
     profileForm: document.getElementById("profile-form"),
     profileNicknameInput: document.getElementById("profile-nickname-input"),
     profileAvatarInput: document.getElementById("profile-avatar-input"),
-    profileToken: document.getElementById("profile-token"),
-    copyTokenButton: document.getElementById("copy-token-button"),
+    profileApiKey: document.getElementById("profile-api-key"),
+    copyApiKeyButton: document.getElementById("copy-api-key-button"),
+    rotateApiKeyButton: document.getElementById("rotate-api-key-button"),
+    apiKeyNote: document.getElementById("api-key-note"),
     profileMessage: document.getElementById("profile-message"),
     startDate: document.getElementById("start-date"),
     endDate: document.getElementById("end-date"),
@@ -111,13 +114,15 @@
       event.preventDefault();
       saveProfile();
     });
-    elements.copyTokenButton.addEventListener("click", copyAccessToken);
+    elements.copyApiKeyButton.addEventListener("click", copyOwnerApiKey);
+    elements.rotateApiKeyButton.addEventListener("click", rotateOwnerApiKey);
     elements.copyGroupIdButton.addEventListener("click", copyGroupId);
     document.addEventListener("click", closeProfilePopover);
     window.addEventListener("scroll", updateActiveNav);
 
     elements.groupSelect.addEventListener("change", function () {
       state.groupId = elements.groupSelect.value;
+      state.ownerApiKey = "";
       writeGroupToUrl(state.groupId);
       loadSnapshot();
     });
@@ -379,6 +384,7 @@
     var group = state.snapshot.group;
     elements.groupTitle.textContent = group.name;
     renderGroupId(group.id);
+    renderApiKeyStatus(group);
     elements.groupNameInput.value = group.name || "";
     elements.groupDescriptionInput.value = group.description || "";
     elements.autoKickSelect.value = String(group.auto_kick_days || 0);
@@ -456,28 +462,57 @@
     var metadata = user.user_metadata || {};
     var nickname = profile.nickname || metadata.nickname || emailPrefix(email) || "禅友";
     var avatarUrl = profile.avatar_url || metadata.avatar_url || "";
-    var token = state.session && state.session.access_token || "";
 
     elements.profileDisplayName.textContent = nickname;
     elements.profileEmail.textContent = email || "已登录";
     elements.profileNicknameInput.value = nickname === "禅友" ? "" : nickname;
     elements.profileAvatarInput.value = avatarUrl;
-    elements.profileToken.textContent = token ? compactToken(token) : "未登录";
     renderAvatar(elements.profileAvatar, nickname, avatarUrl);
     renderAvatar(elements.profilePopoverAvatar, nickname, avatarUrl);
   }
 
-  function copyAccessToken() {
-    var token = state.session && state.session.access_token || "";
-    if (!token) {
-      setProfileMessage("当前没有可复制的 token。");
+  function copyOwnerApiKey() {
+    if (!state.ownerApiKey) {
+      setProfileMessage("当前没有可复制的 API Key。");
       return;
     }
 
-    copyText(token).then(function () {
-      showCopiedIcon(elements.copyTokenButton);
+    copyText(state.ownerApiKey).then(function () {
+      showCopiedIcon(elements.copyApiKeyButton);
     }).catch(function () {
-      setProfileMessage("复制失败，请手动选中 token。");
+      setProfileMessage("复制失败，请手动选中 API Key。");
+    });
+  }
+
+  function rotateOwnerApiKey() {
+    if (!state.groupId) {
+      setProfileMessage("请先选择一个群组。");
+      return;
+    }
+
+    setProfileMessage("正在生成 API Key…");
+    setBusy(elements.rotateApiKeyButton, true, "生成中…");
+
+    client.rpc("rotate_group_owner_admin_api_key", {
+      target_group_id: state.groupId
+    }).then(function (result) {
+      if (result.error) {
+        throw result.error;
+      }
+
+      var payload = result.data || {};
+      state.ownerApiKey = payload.api_key || "";
+      if (state.snapshot && state.snapshot.group) {
+        state.snapshot.group.api_key_last4 = payload.last4 || "";
+        state.snapshot.group.api_key_updated_at = payload.updated_at || null;
+        state.snapshot.group.api_key_last_used_at = payload.last_used_at || null;
+      }
+      renderApiKeyStatus(state.snapshot && state.snapshot.group || {});
+      setProfileMessage("API Key 已生成，仅显示一次，请立即复制。");
+    }).catch(function (error) {
+      setProfileMessage(error.message || "API Key 生成失败。");
+    }).finally(function () {
+      setBusy(elements.rotateApiKeyButton, false, "生成 / 重置 API Key");
     });
   }
 
@@ -921,6 +956,8 @@
 
   function clearDashboard() {
     renderGroupId("");
+    state.ownerApiKey = "";
+    renderApiKeyStatus({});
     elements.metricGrid.innerHTML = "";
     elements.trendChart.innerHTML = "";
     elements.riskList.innerHTML = "";
@@ -936,6 +973,36 @@
     var value = String(groupId || "");
     elements.groupIdLine.textContent = value ? "group_id: " + value : "";
     elements.groupIdRow.hidden = !value;
+  }
+
+  function renderApiKeyStatus(group) {
+    var hasRawKey = Boolean(state.ownerApiKey);
+    var last4 = group && group.api_key_last4 || "";
+
+    if (hasRawKey) {
+      elements.profileApiKey.textContent = state.ownerApiKey;
+      elements.copyApiKeyButton.hidden = false;
+      elements.apiKeyNote.textContent = "仅显示一次，请复制保存。重置后旧 key 立刻失效。";
+      return;
+    }
+
+    elements.copyApiKeyButton.hidden = true;
+    if (!state.groupId) {
+      elements.profileApiKey.textContent = "选择群组后可生成";
+      elements.apiKeyNote.textContent = "用于外部 API 调用。重置后旧 key 立刻失效。";
+      return;
+    }
+
+    if (last4) {
+      elements.profileApiKey.textContent = "已生成 · 尾号 " + last4;
+      elements.apiKeyNote.textContent = group.api_key_last_used_at
+        ? "上次使用：" + formatDateTime(new Date(group.api_key_last_used_at))
+        : "已生成。重置后旧 key 立刻失效。";
+      return;
+    }
+
+    elements.profileApiKey.textContent = "未生成";
+    elements.apiKeyNote.textContent = "生成后用于外部 API 调用，不依赖用户 accessToken。";
   }
 
   function activeMembers() {
@@ -1154,14 +1221,6 @@
 
   function emailPrefix(email) {
     return String(email || "").split("@")[0] || "";
-  }
-
-  function compactToken(token) {
-    var value = String(token || "");
-    if (value.length <= 28) {
-      return value;
-    }
-    return value.slice(0, 14) + "..." + value.slice(-10);
   }
 
   function startOfLocalDay(date) {

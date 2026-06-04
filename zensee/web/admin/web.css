@@ -668,6 +668,18 @@ textarea:focus {
   text-overflow: ellipsis;
 }
 
+.field-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.token-field .ghost-button {
+  width: 100%;
+  min-height: 38px;
+}
+
 .profile-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
