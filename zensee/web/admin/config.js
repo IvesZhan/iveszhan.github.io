@@ -1,5 +1,5 @@
 window.ZENSEE_ADMIN_CONFIG = {
   siteBaseUrl: "https://iveszhan.github.io/zensee/web",
-  supabaseUrl: "https://iqoxyfztxyiqpyqpvoub.supabase.co",
-  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxb3h5Znp0eHlpcXB5cXB2b3ViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzI2NDYsImV4cCI6MjA4ODAwODY0Nn0.jxCNir811FAcy2O1CL8kjkZk4g3rM5t4hxdodCYeiWI"
+  supabaseUrl: "https://ftdkwmuyjtzpdqktpvgg.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0ZGt3bXV5anR6cGRxa3RwdmdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2ODU5ODcsImV4cCI6MjEwNjI2MTk4N30.DFqCZJr0_papLIRDTyBnfScA86hIUQRG_RA23kdJ2vg"
 };
