@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f4ec">
   <meta name="referrer" content="no-referrer">
-  <title>禅·见 | 群主后台</title>
+  <title>禅·见 | 群组管理后台</title>
   <link rel="icon" href="../assets/images/brand/favicon.png">
-  <link rel="stylesheet" href="./web.css?v=20261008-social">
+  <link rel="stylesheet" href="./web.css?v=20261008-admins">
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="群主后台导航">
+    <aside class="sidebar" aria-label="群组管理后台导航">
       <a class="brand" href="../">
         <img src="../assets/images/brand/meditation-icon.png" alt="" width="36" height="36">
         <span>禅·见</span>
       </a>
 
       <div class="owner-gate">
-        <span class="eyebrow">群主工作台</span>
+        <span class="eyebrow">群组管理工作台</span>
         <p>按日期巡查打卡、请假、缺勤和入群申请。</p>
       </div>
 
@@ -40,9 +40,9 @@
     <main class="main-panel">
       <section id="auth-panel" class="auth-panel" aria-labelledby="auth-title">
         <div>
-          <span class="eyebrow">Owner Access</span>
-          <h1 id="auth-title">群主登录</h1>
-          <p>使用 App 中的同一个钉钉账号或邮箱登录，管理你创建的群组。</p>
+          <span class="eyebrow">Management Access</span>
+          <h1 id="auth-title">管理后台登录</h1>
+          <p>使用 App 中的同一个钉钉账号或邮箱登录，管理你创建或担任管理员的群组。</p>
         </div>
         <form id="auth-form" class="auth-form">
           <button id="dingtalk-login-button" class="secondary-button" type="button">钉钉登录</button>
@@ -63,8 +63,8 @@
       <section id="dashboard-panel" class="dashboard-panel" hidden>
         <header class="topbar">
           <div>
-            <span class="eyebrow">Owner Dashboard</span>
-            <h1 id="group-title">群主后台</h1>
+            <span class="eyebrow">Group Management</span>
+            <h1 id="group-title">群组管理后台</h1>
             <p id="group-id-row" class="group-id-line" hidden>
               <span id="group-id-line"></span>
               <button id="copy-group-id-button" class="copy-icon-button" type="button" aria-label="复制 group_id" title="复制 group_id">
@@ -95,10 +95,10 @@
                     <input id="profile-avatar-input" type="url" placeholder="https://">
                   </label>
                   <div class="token-field">
-                    <span>群主 API Key</span>
+                    <span>群组 API Key</span>
                     <div class="token-row">
                       <code id="profile-api-key">选择群组后可生成</code>
-                      <button id="copy-api-key-button" class="copy-icon-button" type="button" aria-label="复制群主 API Key" title="复制群主 API Key" hidden>
+                      <button id="copy-api-key-button" class="copy-icon-button" type="button" aria-label="复制群组 API Key" title="复制群组 API Key" hidden>
                         <span aria-hidden="true" class="copy-icon"></span>
                       </button>
                     </div>
@@ -275,7 +275,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20261008-social"></script>
-  <script src="./app.js?v=20261008-social"></script>
+  <script src="./config.js?v=20261008-admins"></script>
+  <script src="./app.js?v=20261008-admins"></script>
 </body>
 </html>

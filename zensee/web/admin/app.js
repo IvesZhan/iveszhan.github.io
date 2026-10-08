@@ -7,6 +7,7 @@
   var socialStateKey = "zensee.admin.social.ftdkwmuyjtzpdqktpvgg.v1";
   var socialConfigPromise = null;
   var socialBusy = false;
+  var snapshotRevision = 0;
 
   var state = {
     session: null,
@@ -129,6 +130,8 @@
     elements.groupSelect.addEventListener("change", function () {
       state.groupId = elements.groupSelect.value;
       state.ownerApiKey = "";
+      state.snapshot = null;
+      clearDashboard();
       writeGroupToUrl(state.groupId);
       loadSnapshot();
     });
@@ -268,12 +271,13 @@
     renderAuthState();
     renderProfileFromSession();
     loadProfile();
-    setDashboardMessage("登录成功，正在确认群主权限…");
+    setDashboardMessage("登录成功，正在确认管理权限…");
     return fetchOwnerGroups().then(function (groups) {
+      if (!state.session || state.session.user.id !== session.user.id) return;
       state.groups = groups;
 
       if (!state.groups.length) {
-        throw new Error("登录成功，但当前账号没有可管理的群组。请确认你是群主。");
+        throw new Error("登录成功，但当前账号没有可管理的群组。请确认你是群主或管理员。");
       }
 
       renderGroupSelect();
@@ -398,6 +402,7 @@
       state.groups = [];
       state.groupId = "";
       state.snapshot = null;
+      snapshotRevision += 1;
       closeProfilePopover();
       renderAuthState();
       clearDashboard();
@@ -405,10 +410,12 @@
   }
 
   function loadGroups() {
+    var userId = state.session && state.session.user.id;
     setDashboardMessage("正在加载群组…");
     elements.groupSelect.disabled = true;
 
     return fetchOwnerGroups().then(function (groups) {
+      if (!state.session || state.session.user.id !== userId) return null;
       state.groups = groups;
       renderGroupSelect();
 
@@ -462,22 +469,35 @@
     }
 
     syncDatesFromInputs();
+    var revision = ++snapshotRevision;
+    var groupId = state.groupId;
+    var userId = state.session && state.session.user.id;
     setDashboardMessage("正在更新看板…");
 
     return client.rpc("get_group_owner_admin_snapshot", {
-      target_group_id: state.groupId,
+      target_group_id: groupId,
       target_start_date: state.startDate,
       target_end_date: state.endDate,
       target_selected_date: state.selectedDate
     }).then(function (result) {
+      if (revision !== snapshotRevision || groupId !== state.groupId || !state.session || state.session.user.id !== userId) return false;
       if (result.error) {
         throw result.error;
       }
       state.snapshot = result.data;
+      state.groups = state.groups.map(function (group) {
+        return group.id === groupId ? Object.assign({}, group, state.snapshot.group) : group;
+      });
+      renderGroupSelect();
+      elements.groupSelect.value = groupId;
       renderDashboard();
       setDashboardMessage("已更新：" + formatDateTime(new Date()));
+      return true;
     }).catch(function (error) {
-      setDashboardMessage(error.message || "看板加载失败。");
+      if (revision === snapshotRevision && groupId === state.groupId && state.session && state.session.user.id === userId) {
+        setDashboardMessage(error.message || "看板加载失败。");
+      }
+      return false;
     });
   }
 
@@ -591,7 +611,8 @@
   }
 
   function rotateOwnerApiKey() {
-    if (!state.groupId) {
+    var context = managementContext();
+    if (!context) {
       setProfileMessage("请先选择一个群组。");
       return;
     }
@@ -599,9 +620,10 @@
     setProfileMessage("正在生成 API Key…");
     setBusy(elements.rotateApiKeyButton, true, "生成中…");
 
-    client.rpc("rotate_group_owner_admin_api_key", {
-      target_group_id: state.groupId
+    client.rpc("rotate_group_management_api_key", {
+      target_group_id: context.groupId, expected_user_id: context.userId
     }).then(function (result) {
+      if (!isCurrentManagementContext(context)) return;
       if (result.error) {
         throw result.error;
       }
@@ -616,7 +638,7 @@
       renderApiKeyStatus(state.snapshot && state.snapshot.group || {});
       setProfileMessage("API Key 已生成，仅显示一次，请立即复制。");
     }).catch(function (error) {
-      setProfileMessage(error.message || "API Key 生成失败。");
+      if (isCurrentManagementContext(context)) setProfileMessage(error.message || "API Key 生成失败。");
     }).finally(function () {
       setBusy(elements.rotateApiKeyButton, false, "生成 / 重置 API Key");
     });
@@ -818,7 +840,11 @@
     }
 
     elements.memberTableBody.innerHTML = members.map(function (member) {
-      var canRemove = member.role !== "owner";
+      var canRemove = member.role === "member" && member.user_id !== state.session.user.id;
+      var canAppoint = state.snapshot.group.viewer_role === "owner" && member.role !== "owner";
+      var actions = [];
+      if (canAppoint) actions.push("<button class=\"secondary-button\" type=\"button\" data-admin=\"" + escapeHtml(member.user_id) + "\" data-enabled=\"" + (member.role === "admin" ? "false" : "true") + "\">" + (member.role === "admin" ? "取消管理员" : "设为管理员") + "</button>");
+      if (canRemove) actions.push("<button class=\"danger-button\" type=\"button\" data-remove=\"" + escapeHtml(member.user_id) + "\">移除</button>");
       return [
         "<tr>",
         "<td>" + memberCell(member) + "</td>",
@@ -828,7 +854,7 @@
         "<td>" + member.missed_days_since_last_ok + " 天</td>",
         "<td>" + escapeHtml(formatNullableDateTime(member.selected_last_shared_at || member.range_last_shared_at)) + "</td>",
         "<td>",
-        canRemove ? "<button class=\"danger-button\" type=\"button\" data-remove=\"" + escapeHtml(member.user_id) + "\">移除</button>" : "<span class=\"status-pill\">群主</span>",
+        actions.length ? "<div class=\"member-actions\">" + actions.join("") + "</div>" : "<span class=\"status-pill\">" + roleLabel(member.role) + "</span>",
         "</td>",
         "</tr>"
       ].join("");
@@ -837,6 +863,11 @@
     elements.memberTableBody.querySelectorAll("[data-remove]").forEach(function (button) {
       button.addEventListener("click", function () {
         removeMember(button.getAttribute("data-remove"));
+      });
+    });
+    elements.memberTableBody.querySelectorAll("[data-admin]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        setAdministrator(button.getAttribute("data-admin"), button.getAttribute("data-enabled") === "true");
       });
     });
   }
@@ -934,62 +965,59 @@
   }
 
   function saveGroupSettings() {
-    if (!state.groupId) {
-      return;
-    }
+    var context = managementContext();
+    if (!context) return;
 
     var payload = {
-      name: elements.groupNameInput.value.trim(),
-      description: elements.groupDescriptionInput.value.trim(),
-      auto_kick_days: Number(elements.autoKickSelect.value)
+      target_group_id: context.groupId,
+      expected_user_id: context.userId,
+      target_name: elements.groupNameInput.value.trim(),
+      target_description: elements.groupDescriptionInput.value.trim(),
+      target_auto_kick_days: Number(elements.autoKickSelect.value)
     };
 
     setDashboardMessage("正在保存群规则…");
 
-    client.from("groups")
-      .update(payload)
-      .eq("id", state.groupId)
+    client.rpc("update_group_management_settings", payload)
       .then(function (result) {
         if (result.error) {
           throw result.error;
         }
-        return loadGroups();
-      })
-      .then(function () {
-        setDashboardMessage("群规则已保存。");
+        return refreshAfterManagementAction(context, "群规则已保存。");
       })
       .catch(function (error) {
-        setDashboardMessage(error.message || "保存失败。");
+        showManagementError(context, error);
       });
   }
 
   function processRequest(requestId, status) {
+    var context = managementContext();
+    if (!context) return;
     setDashboardMessage("正在处理入群申请…");
 
-    client.from("group_join_requests")
-      .update({ status: status })
-      .eq("id", requestId)
-      .eq("group_id", state.groupId)
+    client.rpc("manage_group_join_request", {
+      target_group_id: context.groupId, target_request_id: requestId,
+      target_status: status, expected_user_id: context.userId
+    })
       .then(function (result) {
         if (result.error) {
           throw result.error;
         }
-        return loadSnapshot();
-      })
-      .then(function () {
-        setDashboardMessage(status === "approved" ? "已通过申请。" : "已拒绝申请。");
+        return refreshAfterManagementAction(context, status === "approved" ? "已通过申请。" : "已拒绝申请。");
       })
       .catch(function (error) {
-        setDashboardMessage(error.message || "申请处理失败。");
+        showManagementError(context, error);
       });
   }
 
   function removeMember(userId) {
+    var context = managementContext();
+    if (!context) return;
     var member = activeMembers().find(function (item) {
       return item.user_id === userId;
     });
 
-    if (!member || member.role === "owner") {
+    if (!member || member.role !== "member" || userId === context.userId) {
       return;
     }
 
@@ -999,23 +1027,57 @@
 
     setDashboardMessage("正在移除成员…");
 
-    client.from("group_memberships")
-      .delete()
-      .eq("group_id", state.groupId)
-      .eq("user_id", userId)
-      .eq("role", "member")
+    client.rpc("remove_group_managed_member", {
+      target_group_id: context.groupId, target_user_id: userId, expected_user_id: context.userId
+    })
       .then(function (result) {
         if (result.error) {
           throw result.error;
         }
-        return loadSnapshot();
-      })
-      .then(function () {
-        setDashboardMessage("成员已移除。");
+        return refreshAfterManagementAction(context, "成员已移除。");
       })
       .catch(function (error) {
-        setDashboardMessage(error.message || "移除失败。");
+        showManagementError(context, error);
       });
+  }
+
+  function setAdministrator(userId, enabled) {
+    var context = managementContext();
+    var member = activeMembers().find(function (item) { return item.user_id === userId; });
+    if (!context || !member || state.snapshot.group.viewer_role !== "owner" || member.role === "owner") return;
+    if (!window.confirm((enabled ? "将「" : "取消「") + member.nickname + (enabled ? "」设为管理员？" : "」的管理员权限？"))) return;
+    setDashboardMessage("正在更新管理员权限…");
+    client.rpc("set_group_administrator", {
+      target_group_id: context.groupId, target_user_id: userId, enabled: enabled, expected_user_id: context.userId
+    }).then(function (result) {
+      if (result.error) throw result.error;
+      return refreshAfterManagementAction(context, enabled ? "已设为管理员。" : "已取消管理员权限。");
+    }).catch(function (error) { showManagementError(context, error); });
+  }
+
+  function managementContext() {
+    if (!state.session || !state.snapshot || state.snapshot.group.id !== state.groupId) return null;
+    return { groupId: state.groupId, userId: state.session.user.id };
+  }
+
+  function isCurrentManagementContext(context) {
+    return context.groupId === state.groupId && state.session && context.userId === state.session.user.id;
+  }
+
+  function refreshAfterManagementAction(context, message) {
+    if (!isCurrentManagementContext(context)) return Promise.resolve();
+    return loadSnapshot().then(function (loaded) {
+      if (isCurrentManagementContext(context)) {
+        setDashboardMessage(message + (loaded ? "" : " 请刷新看板查看最新数据。"));
+      }
+    });
+  }
+
+  function showManagementError(context, error) {
+    if (!isCurrentManagementContext(context)) return;
+    var message = error.message || "操作失败，请稍后重试。";
+    if (/only (owner|group managers)|account changed/i.test(message)) message = "管理权限或登录账号已变更，请刷新页面后重试。";
+    setDashboardMessage(message);
   }
 
   function copyRemindList() {
@@ -1038,7 +1100,7 @@
     filteredMembers().forEach(function (member) {
       rows.push([
         member.nickname,
-        member.role === "owner" ? "群主" : "成员",
+        roleLabel(member.role),
         statusLabel(member.selected_status),
         String(member.selected_minutes),
         String(member.range_active_days),
@@ -1125,9 +1187,8 @@
     });
 
     members.sort(function (a, b) {
-      if (a.role === "owner" || b.role === "owner") {
-        return a.role === "owner" ? -1 : 1;
-      }
+      var rank = { owner: 0, admin: 1, member: 2 };
+      if (a.role !== b.role) return (rank[a.role] == null ? 2 : rank[a.role]) - (rank[b.role] == null ? 2 : rank[b.role]);
       if (state.memberSort === "minutes") {
         return b.selected_minutes - a.selected_minutes;
       }
@@ -1155,7 +1216,7 @@
       return [];
     }
     return activeMembers().filter(function (member) {
-      return member.role !== "owner" && member.missed_days_since_last_ok >= days;
+      return member.role === "member" && member.missed_days_since_last_ok >= days;
     });
   }
 
@@ -1214,7 +1275,7 @@
       "<div class=\"avatar\">" + avatar + "</div>",
       "<div class=\"member-name\">",
       "<strong>" + escapeHtml(member.nickname || "禅友") + "</strong>",
-      "<span>" + (member.role === "owner" ? "群主" : "成员") + " · 入群 " + escapeHtml(shortDate(member.joined_at)) + "</span>",
+      "<span>" + roleLabel(member.role) + " · 入群 " + escapeHtml(shortDate(member.joined_at)) + "</span>",
       "</div>",
       "</div>"
     ].join("");
@@ -1222,6 +1283,10 @@
 
   function statusPill(status) {
     return "<span class=\"status-pill " + escapeHtml(status) + "\">" + escapeHtml(statusLabel(status)) + "</span>";
+  }
+
+  function roleLabel(role) {
+    return role === "owner" ? "群主" : role === "admin" ? "管理员" : "成员";
   }
 
   function statusLabel(status) {
