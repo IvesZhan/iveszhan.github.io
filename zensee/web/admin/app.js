@@ -2,8 +2,11 @@
   var config = window.ZENSEE_ADMIN_CONFIG || {};
   var supabaseGlobal = window.supabase;
   var client = supabaseGlobal && config.supabaseUrl && config.supabaseAnonKey
-    ? supabaseGlobal.createClient(config.supabaseUrl, config.supabaseAnonKey)
+    ? supabaseGlobal.createClient(config.supabaseUrl, config.supabaseAnonKey, { auth: { detectSessionInUrl: false } })
     : null;
+  var socialStateKey = "zensee.admin.social.ftdkwmuyjtzpdqktpvgg.v1";
+  var socialConfigPromise = null;
+  var socialBusy = false;
 
   var state = {
     session: null,
@@ -26,6 +29,7 @@
     emailInput: document.getElementById("email-input"),
     passwordInput: document.getElementById("password-input"),
     authMessage: document.getElementById("auth-message"),
+    dingtalkLoginButton: document.getElementById("dingtalk-login-button"),
     dashboardMessage: document.getElementById("dashboard-message"),
     sideNav: document.getElementById("side-nav"),
     groupSelect: document.getElementById("group-select"),
@@ -85,6 +89,7 @@
       return;
     }
 
+    if (handleSocialCallback()) return;
     client.auth.getSession().then(function (result) {
       state.session = result.data.session;
       renderAuthState();
@@ -103,6 +108,7 @@
     });
 
     elements.signOutButton.addEventListener("click", signOut);
+    elements.dingtalkLoginButton.addEventListener("click", startSocialLogin);
     elements.profileButton.addEventListener("click", function (event) {
       event.stopPropagation();
       toggleProfilePopover();
@@ -240,8 +246,9 @@
   }
 
   function signIn() {
+    if (socialBusy) return;
     showAuthMessage("正在登录…");
-    setBusy(elements.authForm.querySelector("button"), true, "登录中");
+    setSocialBusy(true);
 
     client.auth.signInWithPassword({
       email: elements.emailInput.value.trim(),
@@ -250,14 +257,19 @@
       if (result.error) {
         throw result.error;
       }
-      state.session = result.data.session;
-      elements.passwordInput.value = "";
-      renderAuthState();
-      renderProfileFromSession();
-      loadProfile();
-      setDashboardMessage("登录成功，正在确认群主权限…");
-      return fetchOwnerGroups();
-    }).then(function (groups) {
+      return completeSignIn(result.data.session);
+    }).catch(showSignInError).finally(function () { setSocialBusy(false); });
+  }
+
+  function completeSignIn(session) {
+    if (!session) throw new Error("未获取到登录会话，请重新登录。");
+    state.session = session;
+    elements.passwordInput.value = "";
+    renderAuthState();
+    renderProfileFromSession();
+    loadProfile();
+    setDashboardMessage("登录成功，正在确认群主权限…");
+    return fetchOwnerGroups().then(function (groups) {
       state.groups = groups;
 
       if (!state.groups.length) {
@@ -270,20 +282,114 @@
       elements.groupSelect.disabled = false;
       writeGroupToUrl(state.groupId);
       return loadSnapshot();
-    }).catch(function (error) {
-      var message = error.message || "登录失败，请检查账号密码。";
-      if (/get_group_owner_admin_groups|function/i.test(message)) {
-        message = "登录成功，但后台接口还未部署。请先在 Supabase 执行 group_owner_admin_dashboard.sql。";
-      }
-      if (state.session) {
-        renderAuthState();
-        setDashboardMessage(message);
-      } else {
-        showAuthMessage(message);
-      }
-    }).finally(function () {
-      setBusy(elements.authForm.querySelector("button"), false, "登录后台");
     });
+  }
+
+  function showSignInError(error) {
+    var message = error.message || "登录失败，请检查账号密码。";
+    if (/get_group_owner_admin_groups|function/i.test(message)) {
+      message = "登录接口暂时不可用，请稍后重试。";
+    }
+    if (state.session) {
+      renderAuthState();
+      setDashboardMessage(message);
+    } else {
+      showAuthMessage(message);
+    }
+  }
+
+  function setSocialBusy(busy) {
+    socialBusy = busy;
+    elements.dingtalkLoginButton.disabled = busy;
+    elements.authForm.querySelector("button[type='submit']").disabled = busy;
+  }
+
+  function invokeSocialLogin(body) {
+    return client.functions.invoke("social-login-cn", { body: body }).then(function (result) {
+      if (!result.error) return result.data;
+      var response = result.error.context;
+      if (response && typeof response.json === "function") {
+        return response.json().catch(function () { return {}; }).then(function (payload) {
+          throw new Error(payload.error || result.error.message || "社交登录失败，请重试。");
+        });
+      }
+      throw result.error;
+    });
+  }
+
+  function startSocialLogin() {
+    if (socialBusy) return;
+    setSocialBusy(true);
+    showAuthMessage("正在打开钉钉授权…");
+    loadSocialConfig().then(function (loginConfig) {
+      var appId = loginConfig.dingtalkClientId;
+      if (!appId) throw new Error("钉钉登录暂时不可用，请稍后重试。");
+      var random = new Uint8Array(32);
+      window.crypto.getRandomValues(random);
+      var nonce = Array.from(random).map(function (value) { return value.toString(16).padStart(2, "0"); }).join("");
+      var oauthState = "zensee-admin-dingtalk-" + nonce;
+      sessionStorage.setItem(socialStateKey, JSON.stringify({
+        provider: "dingtalk", state: oauthState, createdAt: Date.now(), groupId: state.groupId || new URLSearchParams(window.location.search).get("group_id") || ""
+      }));
+      var url = new URL("https://login.dingtalk.com/oauth2/auth");
+      url.searchParams.set("client_id", appId);
+      url.searchParams.set("redirect_uri", "https://iveszhan.github.io/zensee/dingtalk-auth/");
+      url.searchParams.set("response_type", "code");
+      url.searchParams.set("scope", "openid");
+      url.searchParams.set("state", oauthState);
+      url.searchParams.set("prompt", "consent");
+      window.location.assign(url.toString());
+    }).catch(showSignInError).finally(function () { setSocialBusy(false); });
+  }
+
+  function loadSocialConfig() {
+    if (!socialConfigPromise) {
+      socialConfigPromise = invokeSocialLogin({ mode: "web_config" }).catch(function (error) {
+        socialConfigPromise = null;
+        throw error;
+      });
+    }
+    return socialConfigPromise;
+  }
+
+  function handleSocialCallback() {
+    var url = new URL(window.location.href);
+    var code = url.searchParams.get("authCode") || url.searchParams.get("code");
+    var oauthState = url.searchParams.get("state");
+    var error = url.searchParams.get("error");
+    if (!code && !oauthState && !error) return false;
+    // Authorization codes are single-use and must not remain in history or page referrers.
+    ["authCode", "code", "state", "error", "error_description", "provider"].forEach(function (key) { url.searchParams.delete(key); });
+    window.history.replaceState({}, "", url.toString());
+    var pending;
+    try {
+      pending = JSON.parse(sessionStorage.getItem(socialStateKey) || "null");
+      sessionStorage.removeItem(socialStateKey);
+    } catch (_) { pending = null; }
+    if (!pending || pending.state !== oauthState || !Number.isFinite(pending.createdAt) || Date.now() - pending.createdAt < 0 ||
+        Date.now() - pending.createdAt > 10 * 60 * 1000 || pending.provider !== "dingtalk") {
+      showAuthMessage("登录授权已过期或不匹配，请重新发起登录。");
+      return true;
+    }
+    if (error || !code) {
+      showAuthMessage("授权未完成，请重新发起登录。");
+      return true;
+    }
+    if (pending.groupId) {
+      url.searchParams.set("group_id", pending.groupId);
+      window.history.replaceState({}, "", url.toString());
+    }
+    setSocialBusy(true);
+    showAuthMessage("授权完成，正在登录…");
+    invokeSocialLogin({ provider: pending.provider, code: code, state: oauthState, platform: "web" })
+      .then(function (result) {
+        if (!result || !result.accessToken || !result.refreshToken) throw new Error("未获取到登录会话，请重试。");
+        return client.auth.setSession({ access_token: result.accessToken, refresh_token: result.refreshToken });
+      }).then(function (result) {
+        if (result.error) throw result.error;
+        return completeSignIn(result.data.session);
+      }).catch(showSignInError).finally(function () { setSocialBusy(false); });
+    return true;
   }
 
   function signOut() {

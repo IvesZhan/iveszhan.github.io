@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f4ec">
+  <meta name="referrer" content="no-referrer">
   <title>禅·见 | 群主后台</title>
   <link rel="icon" href="../assets/images/brand/favicon.png">
-  <link rel="stylesheet" href="./web.css">
+  <link rel="stylesheet" href="./web.css?v=20261008-social">
 </head>
 <body>
   <div class="app-shell">
@@ -41,9 +42,11 @@
         <div>
           <span class="eyebrow">Owner Access</span>
           <h1 id="auth-title">群主登录</h1>
-          <p>使用 ZenSee 账号登录。后台数据接口会再次校验你是否为当前群组的群主。</p>
+          <p>使用 App 中的同一个钉钉账号或邮箱登录，管理你创建的群组。</p>
         </div>
         <form id="auth-form" class="auth-form">
+          <button id="dingtalk-login-button" class="secondary-button" type="button">钉钉登录</button>
+          <p class="auth-divider">或使用邮箱登录</p>
           <label>
             <span>邮箱</span>
             <input id="email-input" type="email" autocomplete="email" required>
@@ -272,7 +275,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js"></script>
-  <script src="./app.js"></script>
+  <script src="./config.js?v=20261008-social"></script>
+  <script src="./app.js?v=20261008-social"></script>
 </body>
 </html>

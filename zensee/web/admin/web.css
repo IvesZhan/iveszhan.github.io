@@ -80,6 +80,13 @@ button:disabled {
   opacity: 0.48;
 }
 
+.auth-divider {
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
 a {
   color: inherit;
   text-decoration: none;

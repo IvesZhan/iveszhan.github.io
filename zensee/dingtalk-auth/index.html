@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+  <meta name="referrer" content="no-referrer" />
   <title>ZenSee 钉钉回调页</title>
   <style>
     :root {
@@ -209,6 +210,7 @@
     const provider = params.get("provider") || "";
     const state = params.get("state") || "";
     const error = params.get("error");
+    const isAdminLoginCallback = /^zensee-admin-dingtalk-[a-f0-9]{64}$/.test(state);
     const callbackURL = `${window.location.origin}${window.location.pathname}`;
     const appReturnURL = `zensee://auth/dingtalk-login?provider=dingtalk&code=${encodeURIComponent(authCode || "")}&state=${encodeURIComponent(state)}`;
     const isAppLoginCallback = provider === "dingtalk" && !!authCode;
@@ -275,7 +277,14 @@
     copyButton.addEventListener("click", copyCorpId);
     appReturnLink.href = appReturnURL;
 
-    if (isAppLoginCallback) {
+    if (isAdminLoginCallback) {
+      // Keep the already registered mobile callback URL; admin verifies its own one-time state.
+      const adminURL = new URL("/zensee/web/admin/", window.location.origin);
+      adminURL.searchParams.set("state", state);
+      if (authCode) adminURL.searchParams.set("authCode", authCode);
+      if (error) adminURL.searchParams.set("error", error);
+      window.location.replace(adminURL.toString());
+    } else if (isAppLoginCallback) {
       title.textContent = "钉钉授权已完成";
       summary.textContent = "已经拿到钉钉授权码，ZenSee 正常情况下会通过 Universal Link 自动打开。";
       hint.textContent = "如果没有自动打开，请点击“打开 ZenSee”。如果仍然没有反应，把这个页面完整内容发给 Codex。";
