@@ -757,11 +757,14 @@
 
     elements.trendChart.innerHTML = days.map(function (day) {
       var rate = day.eligible_count ? Math.round(day.checked_in_count / day.eligible_count * 100) : 0;
+      rate = Math.min(100, Math.max(0, rate));
+      // Explicit pixels avoid percentage-height collapse when the containing grid is laid out.
+      var barHeight = Math.round(rate * 1.66);
       var label = day.date.slice(5);
       return [
-        "<button class=\"trend-bar\" type=\"button\" data-date=\"" + escapeHtml(day.date) + "\" title=\"" + label + " · " + rate + "%\">",
-        "<i class=\"trend-bar-fill\" style=\"--bar-height:" + Math.max(rate, 4) + "%\"></i>",
-        "<span>" + escapeHtml(label) + "</span>",
+        "<button class=\"trend-bar\" type=\"button\" data-date=\"" + escapeHtml(day.date) + "\" title=\"" + label + " · " + rate + "%\" aria-label=\"" + label + " 打卡率 " + rate + "%\">",
+        "<i class=\"trend-bar-fill\" aria-hidden=\"true\" style=\"height:" + barHeight + "px\"></i>",
+        "<span class=\"trend-bar-caption\"><strong>" + rate + "%</strong><span>" + escapeHtml(label) + "</span></span>",
         "</button>"
       ].join("");
     }).join("");
