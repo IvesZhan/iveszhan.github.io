@@ -300,8 +300,8 @@ textarea:focus {
 
 .auth-panel,
 .dashboard-panel {
-  max-width: 1240px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .auth-panel {
@@ -324,6 +324,9 @@ textarea:focus {
   font-weight: 700;
   letter-spacing: 0;
 }
+
+.section-heading .eyebrow { display: none; }
+.section-heading:not(.inline-heading) { display: block; }
 
 .auth-panel h1 {
   margin-top: var(--space-3);
@@ -808,7 +811,8 @@ input[type="checkbox"] { width: 18px; min-width: 18px; min-height: 18px; height:
 
 .metric-item strong {
   color: var(--ink);
-  font-family: var(--font-display);
+  font-family: var(--font-body);
+  font-weight: 600;
   font-size: clamp(1.625rem, 2.3vw, 2.25rem);
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -864,9 +868,10 @@ input[type="checkbox"] { width: 18px; min-width: 18px; min-height: 18px; height:
 .trend-bar {
   min-width: 34px;
   min-height: 194px;
+  height: 194px;
   flex: 1 0 34px;
   display: grid;
-  align-content: end;
+  grid-template-rows: 166px 20px;
   gap: var(--space-2);
   border: 0;
   background: transparent;
@@ -877,7 +882,8 @@ input[type="checkbox"] { width: 18px; min-width: 18px; min-height: 18px; height:
   height: var(--bar-height);
   min-height: 4px;
   border-radius: 7px 7px 2px 2px;
-  background: linear-gradient(180deg, var(--sage), var(--sage-strong));
+  align-self: end;
+  background: var(--sage);
 }
 
 .trend-bar span {
