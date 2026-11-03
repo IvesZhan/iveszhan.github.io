@@ -960,10 +960,10 @@
       return;
     }
 
-    elements.ruleImpactCopy.textContent = days + " 天未打卡规则下，以下成员需要优先确认。";
+    elements.ruleImpactCopy.textContent = "从本次入群当天起计算，满 " + days + " 个未打卡日后才会自动移除，当天尚未结束不计入。";
     elements.ruleImpactList.innerHTML = risky.length
       ? risky.map(function (member) {
-        return impactItem(member.nickname, "连续缺勤 " + member.missed_days_since_last_ok + " 天");
+        return impactItem(member.nickname, "连续 " + autoKickMissedDays(member) + " 个完整日未打卡");
       }).join("")
       : empty("当前没有成员达到自动移除风险线");
   }
@@ -1220,8 +1220,22 @@
       return [];
     }
     return activeMembers().filter(function (member) {
-      return member.role === "member" && member.missed_days_since_last_ok >= days;
+      return member.role === "member" && autoKickMissedDays(member) >= days;
     });
+  }
+
+  function autoKickMissedDays(member) {
+    // 与 App 的移除规则一致：本次入群以前不计数，今天未结束不计数，请假不重置。
+    // 旧快照缺少打卡日期时不推断风险，等待新快照，避免把历史缺勤误算给新成员。
+    if (!Object.prototype.hasOwnProperty.call(member, "last_check_in_date")) return 0;
+    var joinedAt = new Date(member.joined_at);
+    if (!Number.isFinite(joinedAt.getTime())) return 0;
+    var joinedDay = Date.parse(formatDate(joinedAt)) / 86400000;
+    var selectedDay = Date.parse(state.selectedDate) / 86400000;
+    var lastCheckInDay = member.last_check_in_date
+      ? Date.parse(member.last_check_in_date) / 86400000
+      : joinedDay - 1;
+    return Math.max(0, selectedDay - Math.max(joinedDay - 1, lastCheckInDay) - 1);
   }
 
   function recentMembers(members) {
