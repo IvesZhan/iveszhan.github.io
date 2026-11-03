@@ -7,7 +7,7 @@
   <meta name="referrer" content="no-referrer">
   <title>禅·见管理后台 · 群组管理</title>
   <link rel="icon" href="../assets/images/brand/favicon.png">
-  <link rel="stylesheet" href="./web.css?v=20261103-modules">
+  <link rel="stylesheet" href="./web.css?v=20261103-clean1">
 </head>
 <body>
   <div class="app-shell">
@@ -18,28 +18,10 @@
       </a>
 
       <nav class="module-nav" aria-label="功能模块">
-        <a href="./" aria-current="page"><span>群组管理</span><small>共修与成员</small></a>
-        <a href="./updates/"><span>版本更新</span><small>三端发布策略</small></a>
+        <a href="./" aria-current="page"><span>群组管理</span></a>
+        <a href="./updates/"><span>版本更新</span></a>
       </nav>
 
-      <div class="owner-gate">
-        <span class="eyebrow">群组管理</span>
-        <p>按日期巡查打卡、请假、缺勤和入群申请。</p>
-      </div>
-
-      <label class="field-label" for="group-select">当前群组</label>
-      <select id="group-select" class="select-control" disabled>
-        <option>登录后加载</option>
-      </select>
-
-      <nav id="side-nav" class="side-nav" aria-label="看板区域" hidden>
-        <a href="#overview">区间总览</a>
-        <a href="#calendar">每日汇总</a>
-        <a href="#day-detail">单日汇总</a>
-        <a href="#members">成员分层</a>
-        <a href="#requests">入群申请</a>
-        <a href="#rules">群规则</a>
-      </nav>
     </aside>
 
     <main class="main-panel">
@@ -68,7 +50,7 @@
       <section id="dashboard-panel" class="dashboard-panel" hidden>
         <header class="topbar">
           <div>
-            <span class="eyebrow">群组管理</span>
+            <span class="eyebrow">禅·见管理后台</span>
             <h1 id="group-title">群组管理</h1>
             <p id="group-id-row" class="group-id-line" hidden>
               <span id="group-id-line"></span>
@@ -78,6 +60,7 @@
             </p>
           </div>
           <div class="topbar-actions">
+            <label class="group-switcher"><span>当前群组</span><select id="group-select" class="select-control" disabled><option>登录后加载</option></select></label>
             <div class="profile-menu">
               <button id="profile-button" class="profile-button" type="button" aria-haspopup="true" aria-expanded="false">
                 <span id="profile-avatar" class="profile-avatar">禅</span>
@@ -120,6 +103,11 @@
             </div>
           </div>
         </header>
+
+        <nav id="side-nav" class="page-tabs" aria-label="群组功能" hidden>
+          <a href="#overview">区间总览</a><a href="#calendar">每日汇总</a><a href="#day-detail">单日汇总</a>
+          <a href="#members">成员分层</a><a href="#requests">入群申请</a><a href="#rules">群设置</a>
+        </nav>
 
         <section class="filter-strip" aria-label="日期筛选">
           <div class="quick-ranges" role="group" aria-label="快捷日期">
@@ -281,6 +269,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20261008-admins"></script>
-  <script src="./app.js?v=20261008-admins"></script>
+  <script src="./app.js?v=20261103-clean1"></script>
 </body>
 </html>

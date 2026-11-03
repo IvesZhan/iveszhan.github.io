@@ -125,7 +125,15 @@
     elements.rotateApiKeyButton.addEventListener("click", rotateOwnerApiKey);
     elements.copyGroupIdButton.addEventListener("click", copyGroupId);
     document.addEventListener("click", closeProfilePopover);
-    window.addEventListener("scroll", updateActiveNav);
+    elements.sideNav.querySelectorAll("a[href^='#']").forEach(function (link) {
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        history.replaceState(null, "", link.getAttribute("href"));
+        showGroupPanel(link.getAttribute("href").slice(1));
+      });
+    });
+    window.addEventListener("hashchange", function () { showGroupPanel(location.hash.slice(1)); });
+    showGroupPanel(location.hash.slice(1));
 
     elements.groupSelect.addEventListener("change", function () {
       state.groupId = elements.groupSelect.value;
@@ -508,7 +516,7 @@
     }
 
     var group = state.snapshot.group;
-    elements.groupTitle.textContent = group.name;
+    elements.groupTitle.textContent = "群组管理";
     renderGroupId(group.id);
     renderApiKeyStatus(group);
     elements.groupNameInput.value = group.name || "";
@@ -529,27 +537,18 @@
     updateActiveNav();
   }
 
+  function showGroupPanel(id) {
+    var panels = ["overview", "calendar", "day-detail", "members", "requests", "rules"];
+    var selected = panels.indexOf(id) >= 0 ? id : "overview";
+    panels.forEach(function (name) { document.getElementById(name).hidden = name !== selected; });
+    document.querySelector(".filter-strip").hidden = selected === "requests" || selected === "rules";
+    updateActiveNav();
+  }
+
   function updateActiveNav() {
-    if (!state.session) {
-      return;
-    }
-
-    var links = Array.prototype.slice.call(elements.sideNav.querySelectorAll("a[href^='#']"));
-    var currentId = "";
-
-    links.forEach(function (link) {
-      var target = document.querySelector(link.getAttribute("href"));
-      if (target && target.getBoundingClientRect().top <= 150) {
-        currentId = target.id;
-      }
-    });
-
-    if (!currentId && links.length) {
-      currentId = links[0].getAttribute("href").slice(1);
-    }
-
-    links.forEach(function (link) {
-      var active = link.getAttribute("href") === "#" + currentId;
+    elements.sideNav.querySelectorAll("a[href^='#']").forEach(function (link) {
+      var target = document.getElementById(link.getAttribute("href").slice(1));
+      var active = target && !target.hidden;
       link.classList.toggle("is-active", active);
       if (active) {
         link.setAttribute("aria-current", "true");
@@ -806,6 +805,8 @@
   function selectDate(date) {
     state.selectedDate = date;
     elements.selectedDate.value = date;
+    history.replaceState(null, "", "#day-detail");
+    showGroupPanel("day-detail");
     loadSnapshot();
   }
 

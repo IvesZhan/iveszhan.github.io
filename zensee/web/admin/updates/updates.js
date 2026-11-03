@@ -20,6 +20,8 @@
   function resetEditor() {
     editing = null; form.reset(); field("target_version").value = "1.2.4";
     byId("editor-title").textContent = "新建策略";
+    byId("editor-section").hidden = true;
+    byId("new-policy").setAttribute("aria-expanded", "false");
   }
   function setSession(next) {
     session = next;
@@ -45,15 +47,18 @@
   }
   function renderPolicies() {
     var list = byId("policy-list"); list.replaceChildren();
-    if (!policies.length) { var empty = document.createElement("p"); empty.textContent = "还没有更新策略。新建策略默认停用，上架后再启用。"; list.appendChild(empty); }
-    policies.forEach(function (policy) {
+    var platform = byId("platform-filter").value, statusFilter = byId("state-filter").value;
+    var visible = policies.filter(function (policy) { return (platform === "all" || policy.platform === platform) && (statusFilter === "all" || policy.enabled === (statusFilter === "enabled")); });
+    byId("policy-count").textContent = policies.length + " 条策略 · " + policies.filter(function (policy) { return policy.enabled; }).length + " 条已启用";
+    if (!visible.length) { var empty = document.createElement("p"); empty.className = "empty-state"; empty.textContent = policies.length ? "没有符合筛选条件的策略。" : "还没有更新策略。点击「新建策略」开始，上架后再启用。"; list.appendChild(empty); }
+    visible.forEach(function (policy) {
       var row = document.createElement("article"); row.className = "policy-row";
       var content = document.createElement("div"), title = document.createElement("h3"), status = document.createElement("span");
       title.textContent = policy.name;
       status.className = "policy-status" + (policy.force_update ? " forced" : "");
       status.textContent = [platforms[policy.platform], policy.enabled ? "已启用" : "已停用", policy.force_update ? "强制更新" : "非强制"].join(" · ");
       var target = document.createElement("p"); target.textContent = "更新至 " + policy.target_version + (policy.target_build ? "（构建 " + policy.target_build + "）" : "") + " · 优先级 " + policy.priority;
-      var range = document.createElement("p"); range.textContent = "旧版本：" + (policy.source_versions.length ? policy.source_versions.join("、") : "全部") + "；范围：" + (policy.source_min_version || "不限") + " ～ " + (policy.source_max_version || "不限");
+      var range = document.createElement("p"); range.className = "policy-range"; range.textContent = "提醒版本：" + (policy.source_versions.length ? policy.source_versions.join("、") : (policy.source_min_version || policy.source_max_version ? (policy.source_min_version || "不限") + " ～ " + (policy.source_max_version || "不限") : "全部旧版本"));
       content.append(title, status, target, range);
       var actions = document.createElement("div"); actions.className = "inline-actions";
       var edit = document.createElement("button"); edit.type = "button"; edit.className = "ghost-button"; edit.textContent = "编辑";
@@ -71,6 +76,8 @@
     field("source_versions").value = policy.source_versions.join(", "); field("force_update").value = String(policy.force_update);
     field("enabled").checked = policy.enabled; field("release_ready").checked = false;
     byId("editor-title").textContent = "编辑策略 · " + policy.name;
+    byId("editor-section").hidden = false;
+    byId("new-policy").setAttribute("aria-expanded", "true");
     byId("editor-section").scrollIntoView({ block: "start" }); field("name").focus({ preventScroll: true });
   }
   async function savePolicy(policy, revision) {
@@ -117,7 +124,14 @@
     } catch (error) { if (current(context)) byId("preview-result").textContent = errorText(error); }
     finally { button.disabled = false; }
   });
-  byId("new-policy").onclick = byId("cancel-edit").onclick = function () { if (!saving) { resetEditor(); byId("editor-section").scrollIntoView({ block: "start" }); } };
+  byId("new-policy").setAttribute("aria-controls", "editor-section");
+  byId("new-policy").onclick = function () {
+    if (saving) return;
+    resetEditor(); byId("editor-section").hidden = false; byId("new-policy").setAttribute("aria-expanded", "true");
+    byId("editor-section").scrollIntoView({ block: "start" }); field("name").focus({ preventScroll: true });
+  };
+  byId("cancel-edit").onclick = function () { if (!saving) { resetEditor(); byId("policy-list").scrollIntoView({ block: "start" }); } };
+  byId("platform-filter").onchange = byId("state-filter").onchange = renderPolicies;
   byId("refresh").onclick = loadPolicies;
   byId("sign-out").onclick = async function () { var result = await client.auth.signOut(); if (result.error) message(errorText(result.error)); else { setSession(null); byId("auth-panel").hidden = false; } };
   field("platform").addEventListener("change", function () { if (!editing) field("target_version").value = { ios: "1.2.4", android: "1.2.0", harmony: "1.0.0" }[field("platform").value]; });

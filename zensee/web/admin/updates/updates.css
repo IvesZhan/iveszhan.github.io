@@ -1,6 +1,10 @@
 .release-workspace { width: 100%; min-width: 0; max-width: 1250px; margin: 0 auto; padding: clamp(24px, 3vw, 48px); }
 .release-header, .release-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
-.release-header h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 42px); margin: 20px 0 8px; }
+.release-header { padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.release-header h1 { font-family: var(--font-body); font-size: 28px; line-height: 1.4; margin: 6px 0; }
+.release-header p { margin: 6px 0 0; font-size: 14px; }
+.release-heading h2, .policy-editor h2 { font-size: 20px; margin: 0; }
+.release-heading p { font-size: 14px; margin: 6px 0 0; }
 .release-workspace p, .release-workspace small { color: var(--muted); }
 .release-workspace [hidden] { display: none !important; }
 .release-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
@@ -10,20 +14,43 @@
 }
 .release-workspace :focus-visible { outline: 2px solid var(--sage); outline-offset: 3px; }
 .release-form .full-width { grid-column: 1 / -1; }
-.release-form fieldset { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.release-form fieldset { margin: 8px 0; padding: 20px 0 0; border: 0; border-top: 1px solid var(--line); min-width: 0; }
+.release-form legend { padding: 0 16px 0 0; font-size: 15px; font-weight: 600; }
+.release-form small { font-size: 12px; line-height: 1.6; }
+.release-form fieldset p, .release-form > p { font-size: 13px; line-height: 1.7; }
 .release-form .check-label { flex-direction: row; align-items: flex-start; gap: 12px; }
-.check-label input { margin-top: 5px; accent-color: var(--sage-strong); }
-.policy-row { padding: 24px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 16px; }
-.policy-row h3 { margin: 0 0 8px; }
-.policy-row p { margin: 6px 0; overflow-wrap: anywhere; }
+.check-label input { margin: 2px 0 0; }
+.policy-list { margin-top: 16px; padding: 0 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.policy-list:has(.empty-state) { padding: 28px; }
+.policy-list .empty-state { border: 0; margin: 0; }
+.policy-row { padding: 24px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 24px; }
+.policy-row:last-child { border-bottom: 0; }
+.policy-row h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.policy-row p { margin: 6px 0; overflow-wrap: anywhere; font-size: 13px; }
 .policy-row .inline-actions { align-content: center; }
 .policy-status { color: var(--sage-strong); font-size: 13px; font-weight: 600; }
 .policy-status.forced { color: var(--wine); }
 .preview-form { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .preview-form label { flex: 1; min-width: 150px; }
+.policy-toolbar { display: flex; gap: 20px; padding: 20px 0 0; }
+.policy-toolbar label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.policy-toolbar select { min-height: 36px; min-width: 120px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+.policy-editor { max-width: 980px; padding: 28px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.policy-editor h2 { margin-bottom: 24px; }
+.form-section-heading { padding-top: 16px; border-top: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+.form-section-heading:first-child { padding-top: 0; border: 0; }
+.policy-preview { padding-top: 20px; border-top: 1px solid var(--line); }
+.policy-preview summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.policy-preview p { font-size: 13px; }
+.policy-preview[open] summary { margin-bottom: 20px; }
+.release-workspace > .form-message:empty { display: none; }
+.release-workspace > .form-message:not(:empty) { padding: 12px 16px; margin-top: 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink-2); font-weight: 500; }
 @media (max-width: 650px) {
   .release-header, .release-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .release-form, .policy-row { grid-template-columns: 1fr; }
-  .release-form fieldset { padding: 14px; }
-  .release-workspace .section-band { padding-top: 28px; padding-bottom: 28px; }
+  .release-form fieldset { padding: 16px 0 0; }
+  .release-form { gap: 20px; }
+  .policy-editor { padding: 20px; }
+  .policy-toolbar { gap: 12px; flex-wrap: wrap; }
+  .policy-list { padding: 0 20px; }
 }
