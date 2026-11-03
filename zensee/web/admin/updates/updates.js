@@ -7,6 +7,7 @@
   var form = byId("policy-form");
   var session = null, userId = "", generation = 0, listRevision = 0, policies = [], editing = null, saving = false;
   var platforms = { ios: "iOS", android: "Android", harmony: "鸿蒙" };
+  var downloadURLs = { ios: "https://apps.apple.com/app/id6760809128", android: "https://www.pgyer.com/zensee-android", harmony: "https://appgallery.huawei.com/app/detail?id=com.zensee.app" };
   function message(value) { byId("message").textContent = value || ""; }
   function field(name) { return form.elements.namedItem(name); }
   function current(context) { return context === generation && session && session.user.id === userId; }
@@ -19,6 +20,7 @@
   }
   function resetEditor() {
     editing = null; form.reset(); field("target_version").value = "1.2.4";
+    field("update_url").value = downloadURLs.ios;
     byId("editor-title").textContent = "新建策略";
     byId("editor-section").hidden = true;
     byId("new-policy").setAttribute("aria-expanded", "false");
@@ -75,6 +77,7 @@
     ["name", "platform", "target_version", "target_build", "source_min_version", "source_max_version", "title", "message", "update_url", "remind_interval_hours", "priority"].forEach(function (key) { field(key).value = policy[key] == null ? "" : policy[key]; });
     field("source_versions").value = policy.source_versions.join(", "); field("force_update").value = String(policy.force_update);
     field("enabled").checked = policy.enabled; field("release_ready").checked = false;
+    field("update_url").value = downloadURLs[policy.platform];
     byId("editor-title").textContent = "编辑策略 · " + policy.name;
     byId("editor-section").hidden = false;
     byId("new-policy").setAttribute("aria-expanded", "true");
@@ -102,6 +105,7 @@
     policy.target_build = field("target_build").value ? Number(field("target_build").value) : null;
     policy.source_versions = field("source_versions").value.split(/[,，\s]+/).filter(Boolean);
     policy.force_update = field("force_update").value === "true"; policy.enabled = field("enabled").checked;
+    policy.update_url = downloadURLs[policy.platform];
     if (!/^https:\/\//i.test(policy.update_url)) { message("更新地址必须使用 HTTPS。"); return; }
     if (editing) policy.id = editing.id;
     savePolicy(policy, editing ? editing.revision : null);
@@ -134,7 +138,10 @@
   byId("platform-filter").onchange = byId("state-filter").onchange = renderPolicies;
   byId("refresh").onclick = loadPolicies;
   byId("sign-out").onclick = async function () { var result = await client.auth.signOut(); if (result.error) message(errorText(result.error)); else { setSession(null); byId("auth-panel").hidden = false; } };
-  field("platform").addEventListener("change", function () { if (!editing) field("target_version").value = { ios: "1.2.4", android: "1.2.0", harmony: "1.0.0" }[field("platform").value]; });
+  field("platform").addEventListener("change", function () {
+    field("update_url").value = downloadURLs[field("platform").value];
+    if (!editing) field("target_version").value = { ios: "1.2.4", android: "1.2.0", harmony: "1.0.0" }[field("platform").value];
+  });
   resetEditor();
   if (!client) { message("后台连接配置未加载，请刷新页面。"); return; }
   client.auth.onAuthStateChange(function (_event, next) { setTimeout(function () { setSession(next); }, 0); });

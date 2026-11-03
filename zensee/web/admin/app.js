@@ -1357,7 +1357,7 @@
     }
     var params = new URLSearchParams(window.location.search);
     params.set("group_id", groupId);
-    window.history.replaceState({}, "", window.location.pathname + "?" + params.toString());
+    window.history.replaceState({}, "", window.location.pathname + "?" + params.toString() + window.location.hash);
   }
 
   function copyText(text) {

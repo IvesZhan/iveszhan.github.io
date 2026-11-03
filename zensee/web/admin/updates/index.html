@@ -7,8 +7,8 @@
   <meta name="referrer" content="no-referrer">
   <title>禅·见管理后台 · 版本更新</title>
   <link rel="icon" href="../../assets/images/brand/favicon.png">
-  <link rel="stylesheet" href="../web.css?v=20261103-clean2">
-  <link rel="stylesheet" href="./updates.css?v=20261103-clean2">
+  <link rel="stylesheet" href="../web.css?v=20261103-clean3">
+  <link rel="stylesheet" href="./updates.css?v=20261103-clean3">
 </head>
 <body>
   <div class="app-shell">
@@ -60,7 +60,7 @@
           <label>弹窗标题（可选）<input name="title" maxlength="120" placeholder="留空使用客户端本地化标题"></label>
           <div class="form-section-heading full-width">弹窗内容</div>
           <label class="full-width">更新说明<textarea name="message" rows="5" maxlength="4000" placeholder="本次更新内容，可使用换行"></textarea></label>
-          <label class="full-width">商店或下载地址<input name="update_url" type="url" placeholder="https://…" required><small>填写对应平台已可下载的 HTTPS 地址。</small></label>
+          <label class="full-width">更新入口<input name="update_url" type="url" readonly required><small>跟随平台自动设置：iOS 为 App Store，鸿蒙为华为应用市场，Android 为蒲公英。</small></label>
           <label class="check-label full-width"><input name="enabled" type="checkbox">启用这条更新策略</label>
           <label class="check-label full-width"><input name="release_ready" type="checkbox">我已确认目标版本正式上架，且上述地址能够获取该版本</label>
           <div class="inline-actions full-width"><button id="save" class="primary-button" type="submit">保存策略</button><button id="cancel-edit" class="ghost-button" type="button">取消编辑</button></div>
@@ -81,6 +81,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../config.js?v=20261103"></script>
-  <script src="./updates.js?v=20261103-clean2"></script>
+  <script src="./updates.js?v=20261103-clean3"></script>
 </body>
 </html>
