@@ -132,6 +132,14 @@ a {
   font-weight: 700;
 }
 
+.brand-context { display: block; margin-top: 3px; font-family: var(--font-body); font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--sidebar-muted); }
+.module-nav { display: grid; gap: 8px; margin-top: 32px; padding-bottom: 24px; border-bottom: 1px solid rgba(246, 234, 216, 0.14); }
+.module-nav a { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; min-height: 48px; padding: 12px 14px; border-radius: var(--radius); color: var(--sidebar-text); }
+.module-nav a span { font-size: 15px; font-weight: 700; }
+.module-nav a small { font-size: 12px; color: var(--sidebar-muted); }
+.module-nav a[aria-current="page"] { background: rgba(246, 234, 216, 0.12); }
+.module-nav a:hover, .module-nav a:focus-visible { background: rgba(246, 234, 216, 0.08); outline: 1px solid rgba(246, 234, 216, 0.35); outline-offset: 2px; }
+
 .brand img {
   display: block;
   width: 38px;
@@ -1149,6 +1157,7 @@ tbody tr:hover {
 }
 
 @media (max-width: 1080px) {
+  .module-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 20px; padding-bottom: 16px; }
   .app-shell {
     grid-template-columns: 1fr;
   }

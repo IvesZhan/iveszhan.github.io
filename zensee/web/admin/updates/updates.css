@@ -1,0 +1,29 @@
+.release-workspace { width: 100%; min-width: 0; max-width: 1250px; margin: 0 auto; padding: clamp(24px, 3vw, 48px); }
+.release-header, .release-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.release-header h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 42px); margin: 20px 0 8px; }
+.release-workspace p, .release-workspace small { color: var(--muted); }
+.release-workspace [hidden] { display: none !important; }
+.release-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.release-form label, .preview-form label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.release-form input:not([type="checkbox"]), .release-form select, .release-form textarea, .preview-form input, .preview-form select {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); color: var(--ink);
+}
+.release-workspace :focus-visible { outline: 2px solid var(--sage); outline-offset: 3px; }
+.release-form .full-width { grid-column: 1 / -1; }
+.release-form fieldset { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.release-form .check-label { flex-direction: row; align-items: flex-start; gap: 12px; }
+.check-label input { margin-top: 5px; accent-color: var(--sage-strong); }
+.policy-row { padding: 24px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 16px; }
+.policy-row h3 { margin: 0 0 8px; }
+.policy-row p { margin: 6px 0; overflow-wrap: anywhere; }
+.policy-row .inline-actions { align-content: center; }
+.policy-status { color: var(--sage-strong); font-size: 13px; font-weight: 600; }
+.policy-status.forced { color: var(--wine); }
+.preview-form { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.preview-form label { flex: 1; min-width: 150px; }
+@media (max-width: 650px) {
+  .release-header, .release-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .release-form, .policy-row { grid-template-columns: 1fr; }
+  .release-form fieldset { padding: 14px; }
+  .release-workspace .section-band { padding-top: 28px; padding-bottom: 28px; }
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f4ec">
+  <meta name="referrer" content="no-referrer">
+  <title>禅·见管理后台 · 版本更新</title>
+  <link rel="icon" href="../../assets/images/brand/favicon.png">
+  <link rel="stylesheet" href="../web.css?v=20261103-modules">
+  <link rel="stylesheet" href="./updates.css?v=20261103">
+</head>
+<body>
+  <div class="app-shell">
+  <aside class="sidebar" aria-label="管理后台导航">
+    <a class="brand" href="../"><img src="../../assets/images/brand/meditation-icon.png" alt="" width="36" height="36"><span>禅·见<small class="brand-context">管理后台</small></span></a>
+    <nav class="module-nav" aria-label="功能模块">
+      <a href="../"><span>群组管理</span><small>共修与成员</small></a>
+      <a href="./" aria-current="page"><span>版本更新</span><small>三端发布策略</small></a>
+    </nav>
+    <div class="owner-gate"><span class="eyebrow">版本更新</span><p>为不同平台和旧版本设置合适的更新提醒，在需要时启用。</p></div>
+  </aside>
+  <main class="main-panel release-workspace">
+    <header class="release-header">
+      <div><span class="eyebrow">版本更新</span><h1>更新策略</h1><p>新版本上架后，按平台和旧版本范围决定是否提醒。</p></div>
+      <button id="sign-out" class="ghost-button" type="button" hidden>退出登录</button>
+    </header>
+    <p id="message" class="form-message" role="status" aria-live="polite"></p>
+    <section id="auth-panel" class="auth-panel" hidden>
+      <div><h2>管理后台登录</h2><p>使用已获版本管理权限的 App 账号。已在其他模块登录的账号可直接进入。</p></div>
+      <form id="login-form" class="auth-form">
+        <label>邮箱<input name="email" type="email" autocomplete="email" required></label>
+        <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-button" type="submit">登录</button>
+      </form>
+    </section>
+    <div id="workspace" hidden>
+      <section class="section-band">
+        <div class="release-heading"><h2>更新策略</h2><div class="inline-actions"><button id="refresh" class="ghost-button" type="button">刷新</button><button id="new-policy" class="primary-button" type="button">新建策略</button></div></div>
+        <p>只有启用的策略才会弹窗。多条策略同时命中时，优先强制更新，其次按优先级、目标版本排序。</p>
+        <div id="policy-list" class="policy-list"></div>
+      </section>
+      <section id="editor-section" class="section-band" aria-labelledby="editor-title">
+        <h2 id="editor-title">新建策略</h2>
+        <form id="policy-form" class="release-form">
+          <label>策略名称<input name="name" maxlength="100" placeholder="例如：iOS 1.2.4 上架提醒" required></label>
+          <label>平台<select name="platform"><option value="ios">iOS</option><option value="android">Android</option><option value="harmony">鸿蒙</option></select></label>
+          <label>目标版本<input name="target_version" placeholder="1.2.4" pattern="[0-9]{1,6}(\.[0-9]{1,6}){0,3}" required></label>
+          <label>目标构建号（可选）<input name="target_build" type="number" min="1" max="2147483647" step="1"><small>仅用于同版本号的构建更新；跨版本更新可留空。</small></label>
+          <fieldset class="full-width"><legend>哪些旧版本需要提醒</legend>
+            <div class="release-form">
+              <label>指定版本（可选）<input name="source_versions" placeholder="1.2.0, 1.2.1"><small>多个版本用逗号分隔，留空表示不限定具体版本。</small></label>
+              <label>最低旧版本（可选）<input name="source_min_version" placeholder="例如 1.1.0"></label>
+              <label>最高旧版本（可选）<input name="source_max_version" placeholder="例如 1.2.3"></label>
+            </div><p>上下限均包含边界；指定版本和范围同时填写时，取交集。全部留空表示所有低于目标的版本。</p>
+          </fieldset>
+          <label>更新方式<select name="force_update"><option value="false">非强制 · 可以稍后再说</option><option value="true">强制 · 更新后才能继续使用</option></select></label>
+          <label>非强制提醒间隔（小时）<input name="remind_interval_hours" type="number" min="1" max="8760" value="24" required></label>
+          <label>优先级<input name="priority" type="number" min="0" max="1000" value="0" required><small>数字越大，优先级越高。</small></label>
+          <label>弹窗标题（可选）<input name="title" maxlength="120" placeholder="留空使用客户端本地化标题"></label>
+          <label class="full-width">更新说明<textarea name="message" rows="5" maxlength="4000" placeholder="本次更新内容，可使用换行"></textarea></label>
+          <label class="full-width">商店或下载地址<input name="update_url" type="url" placeholder="https://…" required><small>填写对应平台已可下载的 HTTPS 地址。</small></label>
+          <label class="check-label full-width"><input name="enabled" type="checkbox">启用这条更新策略</label>
+          <label class="check-label full-width"><input name="release_ready" type="checkbox">我已确认目标版本正式上架，且上述地址能够获取该版本</label>
+          <div class="inline-actions full-width"><button id="save" class="primary-button" type="submit">保存策略</button><button id="cancel-edit" class="ghost-button" type="button">取消编辑</button></div>
+          <p class="full-width">修改策略后，提醒间隔重新计算；停用会在客户端下次成功检查时解除弹窗。正在打坐及完成记录时延后提示。</p>
+        </form>
+      </section>
+      <section class="section-band">
+        <h2>查看版本命中结果</h2><p>输入客户端版本，查看后台会返回哪条策略。这里不模拟本机提醒间隔。</p>
+        <form id="preview-form" class="preview-form">
+          <label>平台<select name="platform"><option value="ios">iOS</option><option value="android">Android</option><option value="harmony">鸿蒙</option></select></label>
+          <label>当前版本<input name="version" placeholder="1.2.0" required></label>
+          <label>当前构建号<input name="build" type="number" min="0" max="2147483647" step="1" value="0" required></label>
+          <button class="secondary-button" type="submit">查看结果</button>
+        </form><p id="preview-result" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+  </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js?v=20261103"></script>
+  <script src="./updates.js?v=20261103"></script>
+</body>
+</html>
