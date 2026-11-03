@@ -77,7 +77,6 @@
     ["name", "platform", "target_version", "target_build", "source_min_version", "source_max_version", "title", "message", "update_url", "remind_interval_hours", "priority"].forEach(function (key) { field(key).value = policy[key] == null ? "" : policy[key]; });
     field("source_versions").value = policy.source_versions.join(", "); field("force_update").value = String(policy.force_update);
     field("enabled").checked = policy.enabled; field("release_ready").checked = false;
-    field("update_url").value = downloadURLs[policy.platform];
     byId("editor-title").textContent = "编辑策略 · " + policy.name;
     byId("editor-section").hidden = false;
     byId("new-policy").setAttribute("aria-expanded", "true");
@@ -105,7 +104,6 @@
     policy.target_build = field("target_build").value ? Number(field("target_build").value) : null;
     policy.source_versions = field("source_versions").value.split(/[,，\s]+/).filter(Boolean);
     policy.force_update = field("force_update").value === "true"; policy.enabled = field("enabled").checked;
-    policy.update_url = downloadURLs[policy.platform];
     if (!/^https:\/\//i.test(policy.update_url)) { message("更新地址必须使用 HTTPS。"); return; }
     if (editing) policy.id = editing.id;
     savePolicy(policy, editing ? editing.revision : null);
