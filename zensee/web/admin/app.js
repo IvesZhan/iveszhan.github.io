@@ -742,7 +742,7 @@
       metric("请假次数", totalLeave + " 次", "区间内请假记录"),
       metric("缺勤次数", totalMissed + " 次", "未打卡且未请假"),
       metric("当前成员", members.length + " 人", "含群主"),
-      metric("待审批", (state.snapshot.pending_requests || []).length + " 条", "待群主处理"),
+      metric("待审批", (state.snapshot.pending_requests || []).length + " 条", "待群主或管理员处理"),
       metric("人均分钟", avgMinutes + " 分", "按当前成员粗略折算"),
       metric("活跃天数", days.filter(function (day) { return day.checked_in_count > 0; }).length + " 天", "区间内至少一人打卡")
     ].join("");
