@@ -55,7 +55,7 @@
             </div><p>上下限均包含边界；指定版本和范围同时填写时，取交集。全部留空表示所有低于目标的版本。</p>
           </fieldset>
           <label>更新方式<select name="force_update"><option value="false">非强制 · 可以稍后再说</option><option value="true">强制 · 更新后才能继续使用</option></select></label>
-          <label>非强制提醒间隔（小时）<input name="remind_interval_hours" type="number" min="1" max="8760" value="24" required></label>
+          <label>非强制提醒间隔（小时）<input name="remind_interval_hours" type="number" min="1" max="8760" value="24" required><small>新版客户端对同一条策略每台设备最多显示 3 次；强制更新不受此限制。</small></label>
           <label>优先级<input name="priority" type="number" min="0" max="1000" value="0" required><small>多条策略命中时，强制优先，其次数字大的优先。</small></label>
           <label>弹窗标题（可选）<input name="title" maxlength="120" placeholder="留空使用客户端本地化标题"></label>
           <div class="form-section-heading full-width">弹窗内容</div>
@@ -64,7 +64,7 @@
           <label class="check-label full-width"><input name="enabled" type="checkbox">启用这条更新策略</label>
           <label class="check-label full-width"><input name="release_ready" type="checkbox">我已确认目标版本正式上架，且上述地址能够获取该版本</label>
           <div class="inline-actions full-width"><button id="save" class="primary-button" type="submit">保存策略</button><button id="cancel-edit" class="ghost-button" type="button">取消编辑</button></div>
-          <p class="full-width">修改策略后，提醒间隔重新计算；停用会在客户端下次成功检查时解除弹窗。正在打坐及完成记录时延后提示。</p>
+          <p class="full-width">修改策略后，提醒间隔重新计算，累计展示次数不重置；停用会在客户端下次成功检查时解除弹窗。正在打坐及完成记录时延后提示。</p>
         </form>
       </section>
       <details class="section-band policy-preview">
