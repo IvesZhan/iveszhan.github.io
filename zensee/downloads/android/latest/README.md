@@ -2,6 +2,7 @@
 
 - APK: `ZenSee-android-latest.apk`
 - Current release: v1.2.1
+- Internal build: 19
 - SHA-256: see `SHA256.txt`
 
 This directory provides the stable download URL used by the web download page and the app share entry.
