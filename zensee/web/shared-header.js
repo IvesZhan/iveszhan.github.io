@@ -1,6 +1,7 @@
 (function () {
   var defaultDownloadLinks = {
     ios: "https://apps.apple.com/app/6760809128",
+    harmony: "https://appgallery.huawei.com/app/detail?id=com.zensee.app",
     androidZhCn: "https://www.pgyer.com/zensee-android",
     androidGlobal: "https://iveszhan.github.io/zensee/downloads/android/latest/ZenSee-android-latest.apk",
     fallback: "https://iveszhan.github.io/zensee/web/download/"
@@ -178,8 +179,10 @@
     var fallback = isConfigured(links.fallback) ? links.fallback : defaultDownloadLinks.fallback;
     var iosLink = isConfigured(links.ios) ? links.ios : defaultDownloadLinks.ios;
     var androidLink = resolveAndroidLink(locale, links);
+    var harmonyLink = isConfigured(links.harmony) ? links.harmony : defaultDownloadLinks.harmony;
     var platform = detectPlatform();
-    var resolved = platform === "ios" ? iosLink : (platform === "android" ? androidLink : fallback);
+    var resolved = platform === "ios" ? iosLink :
+      (platform === "harmony" ? harmonyLink : (platform === "android" ? androidLink : fallback));
 
     for (var i = 0; i < buttons.length; i += 1) {
       var button = buttons[i];
@@ -192,6 +195,11 @@
 
       if (target === "android") {
         button.href = androidLink;
+        continue;
+      }
+
+      if (target === "harmony") {
+        button.href = harmonyLink;
         continue;
       }
 
@@ -211,6 +219,13 @@
   function detectPlatform() {
     var ua = navigator.userAgent || "";
     var isAndroid = /Android/i.test(ua);
+    var harmonyVersion = /HarmonyOS[\s\/-]+(\d+)/i.exec(ua);
+    // 先识别原生鸿蒙；旧版鸿蒙的 Android 兼容浏览器继续使用 APK。
+    if (/OpenHarmony|HarmonyOS\s*NEXT/i.test(ua) ||
+      (harmonyVersion && Number(harmonyVersion[1]) >= 5) ||
+      (/HarmonyOS/i.test(ua) && !harmonyVersion && !isAndroid)) {
+      return "harmony";
+    }
     var isIOS = /iPhone|iPad|iPod/i.test(ua) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 

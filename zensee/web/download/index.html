@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Noto+Serif:wght@400;700;800&amp;display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../shared-header.css?v=20260405b" />
-  <link rel="stylesheet" href="./web.css" />
+  <link rel="stylesheet" href="./web.css?v=20261105harmony" />
 </head>
 <body>
   <div class="page-shell" id="top">
@@ -71,11 +71,20 @@
           <p>不取于相，如如不动。禅·见帮助你开始练习、记录状态，并在长期回看里看见自己的节奏。</p>
           <div class="hero-actions" id="hero-downloads">
             <div class="desktop-downloads">
-              <a class="primary-button" data-download-button data-platform="ios" href="https://iveszhan.github.io/zensee/web/support/">下载 iOS</a>
-              <a class="primary-button" data-download-button data-platform="android" href="https://iveszhan.github.io/zensee/web/support/">下载 Android</a>
+              <a class="primary-button" data-download-button data-platform="ios" href="https://apps.apple.com/app/6760809128">下载 iOS</a>
+              <a class="primary-button" data-download-button data-platform="android" href="https://www.pgyer.com/zensee-android">下载 Android</a>
+              <a class="primary-button" data-download-button data-platform="harmony" href="https://appgallery.huawei.com/app/detail?id=com.zensee.app">下载鸿蒙版</a>
             </div>
             <div class="mobile-download">
-              <a class="primary-button" data-download-button href="https://iveszhan.github.io/zensee/web/support/">下载APP</a>
+              <a class="primary-button" data-download-button data-auto-download-label href="#platform-picker">下载APP</a>
+              <details class="platform-picker" id="platform-picker">
+                <summary>其他版本</summary>
+                <div class="platform-options">
+                  <a data-download-button data-platform="ios" href="https://apps.apple.com/app/6760809128">iOS</a>
+                  <a data-download-button data-platform="android" href="https://www.pgyer.com/zensee-android">Android</a>
+                  <a data-download-button data-platform="harmony" href="https://appgallery.huawei.com/app/detail?id=com.zensee.app">HarmonyOS</a>
+                </div>
+              </details>
             </div>
           </div>
         </div>
@@ -186,8 +195,8 @@
     </footer>
   </div>
 
-  <script src="./config.js"></script>
-  <script src="../shared-header.js?v=20260405b"></script>
-  <script src="./app.js"></script>
+  <script src="./config.js?v=20261105harmony"></script>
+  <script src="../shared-header.js?v=20261105harmony"></script>
+  <script src="./app.js?v=20261105harmony"></script>
 </body>
 </html>

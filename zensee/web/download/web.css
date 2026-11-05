@@ -793,6 +793,14 @@ img {
 }
 
 @media (max-width: 959px) {
+  .hero-visual {
+    transform: none;
+  }
+
+  .hero-glow {
+    right: 0;
+  }
+
   .hero-copy h1 br {
     display: none;
   }
@@ -882,7 +890,8 @@ img {
   }
 
   .hero-actions {
-    display: none;
+    display: flex;
+    width: 100%;
   }
 
   .desktop-downloads {
@@ -917,6 +926,46 @@ img {
   .mobile-download .supporting-note {
     font-size: 13px;
     text-align: center;
+  }
+
+  .platform-picker {
+    width: 100%;
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .platform-picker summary {
+    width: fit-content;
+    min-height: 44px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+
+  .platform-options {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .platform-options a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--primary);
+  }
+
+  .platform-picker summary:focus-visible,
+  .platform-options a:focus-visible {
+    outline: 2px solid var(--brand-accent);
+    outline-offset: 3px;
   }
 
   .hero-media {
