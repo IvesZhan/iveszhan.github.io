@@ -2755,7 +2755,7 @@ body.is-login-dialog-open {
 
 .vr-viewer-actions {
   position: absolute;
-  z-index: 7;
+  z-index: 42;
   right: 18px;
   top: 50%;
   display: grid;
@@ -2788,7 +2788,7 @@ body.is-login-dialog-open {
 
 .vr-viewer-scenes-toggle {
   position: absolute;
-  z-index: 5;
+  z-index: 42;
   bottom: 18px;
   left: 18px;
   min-height: 42px;
@@ -2903,7 +2903,7 @@ body.is-login-dialog-open {
 
 .vr-viewer-map {
   position: absolute;
-  z-index: 5;
+  z-index: 40;
   top: 18px;
   right: 18px;
   width: min(270px, 36vw);
@@ -2998,8 +2998,8 @@ body.is-login-dialog-open {
 .vr-viewer-map button {
   position: absolute;
   z-index: 2;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   color: transparent;
   font-size: 0;
@@ -3037,8 +3037,7 @@ body.is-login-dialog-open {
 }
 
 .vr-viewer-map button.is-active {
-  width: 34px;
-  height: 34px;
+  z-index: 3;
 }
 
 .vr-viewer-map button.is-active::before {
@@ -3057,7 +3056,7 @@ body.is-login-dialog-open {
 
 .vr-viewer-tabs {
   position: absolute;
-  z-index: 4;
+  z-index: 40;
   left: 96px;
   right: 96px;
   bottom: 18px;

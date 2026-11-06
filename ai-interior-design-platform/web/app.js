@@ -1,6 +1,47 @@
-import { APP_CONFIG } from "./config.js";
+import { APP_CONFIG } from "./config.js?v=cloudflare-20261106";
 
 const samples = [
+  {
+    id: "blender-guangyuan-living-dining-v1",
+    name: "广源尚居",
+    title: "Blender客餐厅风格化底图验证",
+    status: "结构验证 · 4096x2048 2:1",
+    area: "客餐厅",
+    style: "现代简约",
+    delivery: "内部风格化底图",
+    summary: "基于广源尚居 RenderSpec 生成客餐厅 Blender 结构模型，并套用现代简约可渲染风格模板，包含墙体、洞口、地面、天花、PBR 材质参数、基础家具、柜体、窗帘与灯光；当前只用于验证结构优先的风格化 VR 底图闭环，不是方案 V1，不可作为客户交付。下一步必须继续替换真实资产/材质并进入 AI 增强和 QA。",
+    floorPlanImage: "./assets/floor-plans/guangyuan-shangju.svg",
+    floorMapPoints: [
+      { roomId: "living-dining", name: "客餐厅", x: 56, y: 48 },
+    ],
+    rooms: [
+      {
+        id: "living-dining",
+        name: "客餐厅 Blender 风格底图",
+        image: "./assets/panoramas/blender-guangyuan-living-dining-v1/01_blender_living_dining.jpg",
+        preview: "./assets/panoramas/blender-guangyuan-living-dining-v1/01_blender_living_dining.jpg",
+        alt: "广源尚居客餐厅 Blender 风格化结构渲染 2:1 全景底图",
+        fit: "cover",
+        roomName: "客餐厅",
+      },
+    ],
+    panoramaScenes: [
+      {
+        id: "blender_living_dining",
+        scene_id: "blender_living_dining",
+        name: "客餐厅 Blender 风格化底图",
+        image: "./assets/panoramas/blender-guangyuan-living-dining-v1/01_blender_living_dining.jpg",
+        preview: "./assets/panoramas/blender-guangyuan-living-dining-v1/01_blender_living_dining.jpg",
+        width: 4096,
+        height: 2048,
+        roomId: "living-dining",
+        source_provider: "blender_structure_renderer",
+        quality_status: "draft",
+        deliverable: false,
+        quality_notes: ["结构、比例和全景投影验证用底图；白模或占位材质不能作为交付版本。", "必须继续套用 StyleTemplateProfile、PBR 材质、真实资产和灯光，并经过 AI 增强/修复/超清与 QA 后才可能进入交付。"],
+      },
+    ],
+  },
   {
     id: "guangyuan-shangju-modern-template",
     name: "广源尚居",
@@ -503,10 +544,23 @@ const canUseDesignerWorkspace =
   role === "designer" || APP_CONFIG.featureFlags.designerWorkspace === true;
 let isAccountLoggedIn = resolveAccountLoginState();
 let accountProfile = resolveAccountProfile();
-let availableSamples = samples
-  .filter((sample) => !sample.templateOnly && (canUseDesignerWorkspace || !sample.designerOnly))
-  .map(normalizeSampleState);
+let availableSamples = samples.filter(isUserVisibleProjectSample).map(normalizeSampleState);
 let availableStyleSamples = [];
+
+function isUserVisibleProjectSample(sample) {
+  if (sample.templateOnly || (!canUseDesignerWorkspace && sample.designerOnly)) {
+    return false;
+  }
+  const scenes = sample.panoramaScenes || [];
+  if (!scenes.length) {
+    return true;
+  }
+  return scenes.every((scene) => {
+    const provider = scene.source_provider || scene.sourceProvider || "";
+    const qualityStatus = normalizeQualityStatus(scene.quality_status || scene.qualityStatus);
+    return isRealPanoramaProvider(provider) && scene.deliverable !== false && qualityStatus === "production";
+  });
+}
 
 const body = document.body;
 const panels = [...document.querySelectorAll("[data-panel]")];
@@ -939,6 +993,7 @@ const floorPreviewFocusPaddingRatio = 0.18;
 const floorPreviewVisibleBoundsPaddingRatio = 0.08;
 
 let activeTab = "samples";
+let hasOpenedRequestedProject = false;
 let activeSampleId = availableSamples[0]?.id || "";
 let activeRoomId = availableSamples[0]?.rooms?.[0]?.id || "";
 let activeAdjustSceneId = "";
@@ -1013,7 +1068,26 @@ renderStyleList();
 renderScheme();
 updateGenerateState();
 setTab(activeTab);
-loadPersistedProjectSamples();
+openRequestedProject();
+loadPublishedProjectSamples().then(loadPersistedProjectSamples);
+
+function openRequestedProject() {
+  if (hasOpenedRequestedProject) return;
+  const query = new URLSearchParams(window.location.search);
+  const requestedId = query.get("project");
+  const sample = availableSamples.find((item) => item.id === requestedId);
+  if (!sample) return;
+  const version = sample.versions?.find((item) => item.id === query.get("version"));
+  if (version) sample.activeVersionId = version.id;
+  activeSampleId = sample.id;
+  activeRoomId = getPreviewScenes(sample)[0]?.id || "";
+  activeAdjustSceneId = getAdjustableScenes(sample)[0]?.id || "";
+  hasOpenedRequestedProject = true;
+  renderSampleList();
+  renderScheme();
+  setSchemePane(version ? "preview" : getPreferredSchemePaneForSample(sample));
+  setTab("scheme-detail");
+}
 loadStaticPanoramaTemplateSamples();
 
 function resolveAccountRole() {
@@ -1300,11 +1374,35 @@ function normalizeSampleState(sample) {
   };
 }
 
+async function loadPublishedProjectSamples() {
+  const results = await Promise.allSettled((APP_CONFIG.publishedProjects || []).map(async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`无法读取已发布方案：${url}`);
+    const sample = createSampleFromPersistedProject(await response.json());
+    if (sample) sample.persisted = false;
+    return sample;
+  }));
+  const published = results.filter((result) => result.status === "fulfilled")
+    .map((result) => result.value).filter(Boolean);
+  results.filter((result) => result.status === "rejected")
+    .forEach((result) => console.warn("Published project load failed:", result.reason));
+  if (!published.length) return;
+  const ids = new Set(published.map((sample) => sample.id));
+  availableSamples = [...published, ...availableSamples.filter((sample) => !ids.has(sample.id))];
+  renderSampleList();
+  renderScheme();
+  openRequestedProject();
+}
+
 async function loadPersistedProjectSamples() {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     return;
   }
+  // Public static sites use published cases, never the visitor's own localhost.
+  const localHosts = ["localhost", "127.0.0.1", "[::1]"];
+  if (localHosts.includes(new URL(apiBaseUrl, window.location.href).hostname)
+      && !localHosts.includes(window.location.hostname)) return;
   try {
     const response = await fetch(`${apiBaseUrl}/api/v1/projects`);
     if (!response.ok) {
@@ -1313,7 +1411,14 @@ async function loadPersistedProjectSamples() {
     const payload = await response.json();
     const persistedSamples = (payload.projects || [])
       .map(createSampleFromPersistedProject)
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((sample) => {
+        const previous = availableSamples.find((item) => item.id === sample.id);
+        if (sample.versions.some((version) => version.id === previous?.activeVersionId)) {
+          sample.activeVersionId = previous.activeVersionId;
+        }
+        return sample;
+      });
     if (!persistedSamples.length) {
       return;
     }
@@ -1322,13 +1427,14 @@ async function loadPersistedProjectSamples() {
       ...persistedSamples,
       ...availableSamples.filter((sample) => !persistedIds.has(sample.id)),
     ];
-    if (!activeSampleId || persistedIds.has(activeSampleId)) {
+    if (!availableSamples.some((sample) => sample.id === activeSampleId)) {
       activeSampleId = persistedSamples[0].id;
       activeRoomId = getPreviewScenes(persistedSamples[0])[0]?.id || "";
       activeAdjustSceneId = getAdjustableScenes(persistedSamples[0])[0]?.id || "";
     }
     renderSampleList();
     renderScheme();
+    openRequestedProject();
   } catch (error) {
     console.warn("Persisted project load failed:", error);
   }
@@ -1843,6 +1949,7 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
   formData.append("file", file);
   formData.append("style", effectiveStyleId);
   formData.append("brief_text", buildDesignBriefText(file, effectiveStylePackage));
+  formData.append("generation_intent", JSON.stringify(buildGenerationIntent(file, effectiveStyleId, effectiveStylePackage)));
 
   const response = await fetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, {
     method: "POST",
@@ -1874,10 +1981,11 @@ async function renderRealPanoramaVersionWithBackend(sample, onProgress = () => {
       project: options.project || config.project,
       project_name: config.projectName || sample.name,
       style: config.style || "modern_minimal",
+      generation_intent: options.generationIntent || getGenerationIntentForSample(sample),
       max_scenes: options.maxScenes || config.maxScenes || 4,
       level: config.level || 2,
       output_width: config.outputWidth || 2048,
-      timeout: config.timeout || (config.sourceProvider === "ai_panorama_renderer" ? 1800 : 20),
+      timeout: config.timeout || (["structure_first_pipeline", "ai_panorama_renderer"].includes(config.sourceProvider) ? 1800 : 20),
       rooms: Array.isArray(options.rooms) ? options.rooms : (Array.isArray(config.rooms) ? config.rooms : undefined),
       render_spec: getBaseRenderSpecForFinalGeneration(sample),
       adjustments: Array.isArray(options.adjustments) ? options.adjustments : sample.adjustments || [],
@@ -1915,6 +2023,19 @@ function getBaseRenderSpecForFinalGeneration(sample) {
   return activeVersion?.renderSpec || sample?.draft?.render_spec || null;
 }
 
+function getGenerationIntentForSample(sample) {
+  const activeVersion = getActiveVersion(sample);
+  const candidates = [
+    sample?.generationIntent,
+    sample?.externalPanoramaImport?.generationIntent,
+    activeVersion?.renderSpec?.metadata?.generation_intent,
+    activeVersion?.vrPackage?.shareMeta?.generation_intent,
+    activeVersion?.vrPackage?.share_meta?.generation_intent,
+    sample?.draft?.render_spec?.metadata?.generation_intent,
+  ];
+  return candidates.find((intent) => intent && typeof intent === "object") || null;
+}
+
 async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
   if (!jobId) {
     throw new Error("后端没有返回真实全景生成任务编号。");
@@ -1937,6 +2058,7 @@ async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
         scenes: [],
         vr_package: job.vr_package || null,
         render_spec: job.render_spec || getBaseRenderSpecForFinalGeneration(getActiveSample()),
+        generation_intent: job.generation_intent || job.vr_package?.share_meta?.generation_intent || null,
         messages: job.messages || [],
       };
     }
@@ -1955,6 +2077,64 @@ async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
 
 function wait(milliseconds) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function buildGenerationIntent(file, styleId, stylePackage) {
+  const selectedPackage = stylePackage || stylePackages[styleId] || {};
+  const promptText = designIdeaInput?.value.trim() || selectedPackage.defaultIdea || "";
+  const effectBriefText = effectBriefDocument?.content?.trim() || "";
+  return {
+    schema_version: "generation_intent/v1",
+    entrypoint: "new_plan_v1",
+    project_name: normalizeProjectName(file?.name || ""),
+    source_inputs: {
+      floor_plan_file: file?.name || "",
+      selected_style_id: styleId || "",
+      selected_style_label: selectedPackage.label || "",
+      prompt: promptText,
+      effect_brief_file: effectBriefDocument?.fileName || "",
+      effect_brief_used: Boolean(effectBriefText),
+    },
+    style_profile: {
+      style_id: styleId || "",
+      style_label: selectedPackage.label || "",
+      template_id: selectedPackage.defaultTemplate?.id || "",
+      template_label: selectedPackage.defaultTemplate?.label || "",
+      adjustable_parameters: selectedPackage.defaultTemplate?.adjustable || [],
+    },
+    style_consistency_locks: [
+      "全屋地面、墙面、门套、柜体、灯光色温和软装语言必须统一。",
+      "每个空间都从同一个 HomeDesignState 和 StyleTemplateProfile 派生。",
+      "局部调整只能在当前风格内改变材质深浅、软装密度、收纳容量和灯光氛围。",
+      "不得让单个空间生成跨风格家具、材质或硬装语言。",
+    ],
+    geometry_locks: [
+      "不得移动墙体、门窗洞口、层高、相邻空间关系和全景相机投影。",
+      "VR 交付图必须保持真实 2:1 equirectangular，不得混入普通透视图。",
+      "调整和 AI 增强必须保留地面水平、天花方向和主要开口位置。",
+    ],
+    delivery_contract: {
+      initial_version: "V1",
+      required_output: "multi_space_vr_package",
+      panorama_aspect_ratio: "2:1",
+      ordinary_preview_not_deliverable: true,
+      adjustments_create_new_version: true,
+      hidden_internal_steps: [
+        "asset_selection",
+        "asset_audit",
+        "render_control_artifacts",
+        "commercial_visual_qa",
+      ],
+    },
+    effect_brief_summary: effectBriefDocument?.parsed
+      ? {
+          style_text: effectBriefDocument.parsed.styleText || "",
+          style_id: effectBriefDocument.parsed.styleId || "",
+          area_m2: effectBriefDocument.parsed.areaM2 || "",
+          floor_height: effectBriefDocument.parsed.floorHeight || "",
+        }
+      : {},
+  };
 }
 
 function buildDesignBriefText(file, stylePackage) {
@@ -2004,6 +2184,7 @@ function buildGeneratedSampleFromDraft(draft, stylePackage, file) {
     rooms: [floorPlanScene],
     initialScenes: [floorPlanScene],
     plannedScenes,
+    generationIntent: draft?.render_spec?.metadata?.generation_intent || buildGenerationIntent(file, selectedStyleId, stylePackage),
     externalPanoramaImport: buildGeneratedSamplePanoramaImport(sampleId, name, draft),
     adjustments: [],
     versions: [],
@@ -2023,10 +2204,11 @@ function buildGeneratedSamplePanoramaImport(sampleId, projectName, draft) {
   return {
     project: sampleId,
     projectName,
-    sourceProvider: "ai_panorama_renderer",
+    sourceProvider: "structure_first_pipeline",
     style: draft?.design_plan?.style || selectedStyleId || "modern_minimal",
+    generationIntent: draft?.render_spec?.metadata?.generation_intent || null,
     maxScenes: Math.max(visualTaskCount || panoramaShotCount || 1, 1),
-    outputWidth: 3840,
+    outputWidth: 4096,
     timeout: 1800,
   };
 }
@@ -2414,6 +2596,78 @@ function buildRoomRegenerationOptions(sample, scene, adjustments) {
     maxScenes: 1,
     rooms: [room],
     adjustments,
+    generationIntent: buildSceneRegenerationIntent(sample, scene, adjustments, versionNumber),
+  };
+}
+
+function buildSceneRegenerationIntent(sample, scene, adjustments, versionNumber) {
+  const baseIntent = getGenerationIntentForSample(sample) || {
+    schema_version: "generation_intent/v1",
+    entrypoint: "new_plan_v1",
+    project_name: sample?.name || "",
+    source_inputs: {
+      selected_style_label: sample?.style || "",
+      prompt: "",
+    },
+    style_profile: {
+      style_label: sample?.style || "",
+    },
+    style_consistency_locks: [],
+    geometry_locks: [],
+    delivery_contract: {
+      initial_version: "V1",
+      required_output: "multi_space_vr_package",
+      panorama_aspect_ratio: "2:1",
+      ordinary_preview_not_deliverable: true,
+      adjustments_create_new_version: true,
+    },
+  };
+  const promptDeltas = adjustments.map((item) => item.promptDelta || item.label).filter(Boolean);
+  return {
+    ...baseIntent,
+    entrypoint: "regenerate_scene",
+    project_name: sample?.name || baseIntent.project_name || "",
+    source_inputs: {
+      ...(baseIntent.source_inputs || {}),
+      prompt: [
+        baseIntent.source_inputs?.prompt || "",
+        promptDeltas.length ? `局部调整：${promptDeltas.join("；")}` : "",
+      ].filter(Boolean).join("；"),
+    },
+    adjustment_scope: {
+      version_number: versionNumber,
+      scope_type: "single_scene",
+      scene_id: scene?.id || "",
+      room_id: scene?.roomId || scene?.room_id || scene?.target_room_id || "",
+      scene_name: scene?.name || scene?.roomName || "",
+      adjustments: adjustments.map((item) => ({
+        action: item.action || "manual",
+        label: item.label || "",
+        prompt_delta: item.promptDelta || item.label || "",
+      })),
+      must_create_new_version: true,
+      keep_other_scenes_from_active_version: true,
+    },
+    style_consistency_locks: [
+      ...new Set([
+        ...((baseIntent.style_consistency_locks || []).filter(Boolean)),
+        "局部重生成必须继承当前版本的全屋材质、灯光、软装语言和硬装风格。",
+        "未被调整的空间必须沿用当前版本，不得重新生成或改变风格。",
+      ]),
+    ],
+    geometry_locks: [
+      ...new Set([
+        ...((baseIntent.geometry_locks || []).filter(Boolean)),
+        "局部重生成不得改变当前空间墙体、门窗、相邻空间关系和 2:1 全景投影。",
+      ]),
+    ],
+    delivery_contract: {
+      ...(baseIntent.delivery_contract || {}),
+      required_output: "multi_space_vr_package",
+      panorama_aspect_ratio: "2:1",
+      ordinary_preview_not_deliverable: true,
+      adjustments_create_new_version: true,
+    },
   };
 }
 
@@ -2660,6 +2914,7 @@ function applyVersionToSample(sample, version, result = {}) {
   sample.status = `${version.title} · 已生成`;
   sample.delivery = isRealPanoramaPackage(version.vrPackage) || version.deliverable ? "真实 2:1 VR全景" : "不可交付预览";
   sample.rooms = version.scenes;
+  sample.generationIntent = version.vrPackage?.shareMeta?.generation_intent || result.generation_intent || getGenerationIntentForSample(sample);
   sample.initialScenes = sample.initialScenes?.length ? sample.initialScenes : version.scenes;
   sample.plannedScenes = version.scenes;
   sample.panoramaScenes = version.vrPackage?.scenes || version.scenes;
@@ -2833,7 +3088,7 @@ function isRealPanoramaPackage(vrPackage) {
 }
 
 function isRealPanoramaProvider(provider) {
-  return ["provided_panorama_asset", "ai_panorama_renderer"].includes(provider);
+  return ["provided_panorama_asset", "structure_first_pipeline", "ai_panorama_renderer"].includes(provider);
 }
 
 function canGenerateRealPanoramas(sample) {
@@ -2858,7 +3113,8 @@ function getVrViewerConfig() {
 }
 
 function getRequestedVrViewerEngine() {
-  return "photoSphere";
+  const engine = String(getVrViewerConfig().engine || "").trim();
+  return engine === "photoSphere" ? "photoSphere" : "legacy";
 }
 
 function loadStylesheetOnce(url, id) {
@@ -3413,7 +3669,7 @@ function parseEffectBriefDocument(content, backendDesignBrief = null) {
 }
 
 function extractEffectBriefAreaText(content) {
-  const match = content.match(/(?:户型面积|建筑面积|套内面积)\s*[:：]\s*(\d+(?:\.\d+)?\s*(?:m²|㎡|m2|平米|平方米)?)/i);
+  const match = content.match(/(?:户型面积|建筑面积|套内面积)\s*[:：]\s*(\d+(?:\.\d+)?\s*(?:m²|㎡|m2|m|平米|平方米)?)/i);
   return match?.[1]?.replace(/\s+/g, "") || "";
 }
 
@@ -4978,22 +5234,23 @@ function requiresLoginForTab(tab) {
 }
 
 function setTab(tab) {
-  if (!canUseDesignerWorkspace && isDesignerTab(tab)) {
+  const nextTab = panels.some((panel) => panel.dataset.panel === tab) ? tab : "samples";
+  if (!canUseDesignerWorkspace && isDesignerTab(nextTab)) {
     return;
   }
-  if (requiresLoginForTab(tab) && !isAccountLoggedIn) {
-    openLoginDialog(tab);
+  if (requiresLoginForTab(nextTab) && !isAccountLoggedIn) {
+    openLoginDialog(nextTab);
     return;
   }
 
-  activeTab = tab;
+  activeTab = nextTab;
 
   panels.forEach((panel) => {
-    panel.classList.toggle("is-active", panel.dataset.panel === tab);
+    panel.classList.toggle("is-active", panel.dataset.panel === nextTab);
   });
 
   navButtons.forEach((button) => {
-    const isActive = button.dataset.goTab === tab || (tab === "scheme-detail" && button.dataset.goTab === "samples");
+    const isActive = button.dataset.goTab === nextTab || (nextTab === "scheme-detail" && button.dataset.goTab === "samples");
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-current", isActive ? "page" : "false");
   });
@@ -5241,10 +5498,10 @@ function renderScheme() {
   const previewVrAvailable = isPreviewVrAvailable(activeVersion);
   renderPreviewVr(sample, activeVersion, room);
   detailRoomName.textContent = previewVrAvailable ? "全屋 VR" : room.name;
-  detailSummary.textContent = activeVersion?.summary || sample.summary;
+  detailSummary.textContent = [room?.description, activeVersion?.summary || sample.summary].filter(Boolean).join(" ");
   detailArea.textContent = sample.area;
   detailStyle.textContent = sample.style;
-  detailDelivery.textContent = hasFinalVersion(sample) ? "VR全景方案" : "第一版生成中";
+  detailDelivery.textContent = previewVrAvailable ? "VR全景方案" : activeVersion ? "效果图预览" : "第一版生成中";
   renderPreviewFloorPlan(sample, activeVersion);
 
   renderSceneTabs(detailRoomTabs, previewVrAvailable ? [] : scenes, activeRoomId, (sceneId) => {
@@ -5452,6 +5709,7 @@ function loadInlineVrTexture(src) {
     return;
   }
   const image = new Image();
+  image.crossOrigin = "anonymous";
   image.onload = () => {
     const { gl, texture } = glState;
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -5640,7 +5898,13 @@ function renderPreviewFloorPlan(sample, activeVersion) {
     image.className = "preview-floor-plan-image";
     image.src = floorPlanImage;
     image.alt = `${sample.name} 户型图`;
-    previewFloorPlan.replaceChildren(title, image);
+    const link = document.createElement("a");
+    link.href = floorPlanImage;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.setAttribute("aria-label", "打开完整户型图");
+    link.append(image);
+    previewFloorPlan.replaceChildren(title, link);
     return;
   }
 
@@ -5703,6 +5967,8 @@ function renderAdjustPanel(sample) {
         : `正在为 ${scene.name} 生成真实 2:1 全景图；生成后会进入全屋 VR 预览，并支持区域场景切换。`;
     } else if (activeVersion?.deliverable) {
       adjustScope.textContent = `正在基于当前终版继续调整 ${scene.name}，重新生成后会记录为下一版 VR 全景方案。`;
+    } else if (sample.previewOnly) {
+      adjustScope.textContent = `当前为 ${scene.name} 的概念效果初稿；可记录调整想法，自动重新生成需接入相应生成服务。`;
     } else if (activeVersion) {
       adjustScope.textContent = `当前版本缺少真实 2:1 全景生成来源，不能继续生成客户可交付版本。`;
     } else {
@@ -5879,7 +6145,7 @@ function openPanoramaViewer(vrPackageOrScenes, sceneId, renderSpec = null) {
     ? sceneId
     : panoramaViewerScenes[0].id;
   panoramaViewerScenesExpanded = false;
-  resetPanoramaViewState();
+  resetPanoramaViewState(getActivePanoramaScene());
   panoramaViewer.classList.toggle("is-photo-sphere", panoramaViewerEngine === "photoSphere");
   panoramaViewer.removeAttribute("data-vr-engine-error");
   panoramaViewer.classList.remove("is-map-hidden");
@@ -5977,14 +6243,26 @@ function renderPanoramaViewer() {
       const label = document.createElement("span");
       label.textContent = item.name;
       button.append(thumb, label);
-      button.addEventListener("click", () => {
-        activePanoramaSceneId = item.id;
-        resetPanoramaViewState();
-        renderPanoramaViewer();
-      });
+      button.addEventListener("click", () => switchPanoramaScene(item.id));
       return button;
     })
   );
+}
+
+function switchPanoramaScene(sceneId) {
+  const scene = panoramaViewerScenes.find((item) => item.id === sceneId || item.sceneId === sceneId || item.scene_id === sceneId);
+  if (!scene) {
+    if (panoramaViewerStatus) {
+      panoramaViewerStatus.textContent = "无法切换到该空间，请检查当前方案的场景数据。";
+    }
+    return false;
+  }
+  if (activePanoramaSceneId !== scene.id) {
+    activePanoramaSceneId = scene.id;
+    resetPanoramaViewState(scene);
+  }
+  renderPanoramaViewer();
+  return true;
 }
 
 function renderPanoramaSceneImage(scene) {
@@ -5995,6 +6273,7 @@ function renderPanoramaSceneImage(scene) {
   panoramaPhotoSphereRequestId += 1;
   destroyPhotoSphereViewer();
   panoramaViewer?.classList.remove("is-photo-sphere");
+  panoramaViewer?.removeAttribute("data-vr-engine-error");
   if (panoramaPhotoSphereStage) {
     panoramaPhotoSphereStage.hidden = true;
   }
@@ -6024,6 +6303,7 @@ async function renderPhotoSphereScene(scene) {
       throw new Error("Photo Sphere Viewer module does not export Viewer.");
     }
     destroyPhotoSphereViewer();
+    panoramaViewer?.removeAttribute("data-vr-engine-error");
     panoramaPhotoSphereViewer = new Viewer({
       container: panoramaPhotoSphereStage,
       panorama: scene.image,
@@ -6125,18 +6405,30 @@ function handlePanoramaWheel(event) {
 }
 
 function resetPanoramaView() {
-  resetPanoramaViewState();
+  resetPanoramaViewState(getActivePanoramaScene());
   if (panoramaPhotoSphereViewer) {
-    panoramaPhotoSphereViewer.rotate?.({ yaw: 0, pitch: 0 });
+    panoramaPhotoSphereViewer.rotate?.({ yaw: panoramaYaw, pitch: 0 });
     panoramaPhotoSphereViewer.zoom?.(50);
   }
   updatePanoramaOverlayPositions();
 }
 
-function resetPanoramaViewState() {
-  panoramaYaw = 0;
+function resetPanoramaViewState(scene = null) {
+  panoramaYaw = getPanoramaDefaultYaw(scene);
   panoramaPitch = 0;
   panoramaFov = vrDefaultFov;
+}
+
+function getActivePanoramaScene() {
+  return panoramaViewerScenes.find((item) => item.id === activePanoramaSceneId) || panoramaViewerScenes[0] || null;
+}
+
+function getPanoramaDefaultYaw(scene) {
+  const value = Number(scene?.default_yaw ?? scene?.defaultYaw ?? 0);
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.abs(value) > Math.PI * 2 ? degreesToRadians(value) : value;
 }
 
 function clampVrFov(value) {
@@ -6183,6 +6475,7 @@ function loadPanoramaTexture(src) {
     return;
   }
   const image = new Image();
+  image.crossOrigin = "anonymous";
   image.onload = () => {
     const { gl, texture } = glState;
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -6427,26 +6720,22 @@ function renderPanoramaMap(activeScene) {
   const mapBody = document.createElement("div");
   mapBody.className = "vr-viewer-map-body";
   mapBody.innerHTML = createPanoramaMinimapSvg();
-  panoramaViewerScenes.forEach((scene, index) => {
-    const point = getPanoramaSceneMapPoint(scene, index);
+  getPanoramaSceneMapPoints(panoramaViewerScenes).forEach(({ scene, point }) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = scene.id === activeScene?.id ? "is-active" : "";
+    button.dataset.sceneId = scene.id;
     button.style.left = `${point.x}%`;
     button.style.top = `${point.y}%`;
     button.setAttribute("aria-label", `切换到${scene.name}`);
+    button.setAttribute("aria-pressed", String(scene.id === activeScene?.id));
     button.title = scene.name;
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
     button.addEventListener("pointermove", (event) => event.stopPropagation());
     button.addEventListener("pointerup", (event) => event.stopPropagation());
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (activePanoramaSceneId === scene.id) {
-        return;
-      }
-      activePanoramaSceneId = scene.id;
-      resetPanoramaViewState();
-      renderPanoramaViewer();
+      switchPanoramaScene(scene.id);
     });
     mapBody.append(button);
   });
@@ -6550,6 +6839,54 @@ function getPanoramaSceneMapPoint(scene, index) {
     return sceneId === scene.id || sceneId === scene.sceneId || roomId === scene.roomId || roomId === scene.room_id;
   });
   return point || panoramaMapPoint(index, panoramaViewerScenes.length);
+}
+
+function getPanoramaSceneMapPoints(scenes) {
+  const placed = [];
+  const safeScenes = Array.isArray(scenes) ? scenes : [];
+  safeScenes.forEach((scene, index) => {
+    const rawPoint = getPanoramaSceneMapPoint(scene, index);
+    const point = resolvePanoramaMapPointCollision(
+      {
+        x: clampMapPercent(rawPoint?.x, 8, 92),
+        y: clampMapPercent(rawPoint?.y, 12, 88),
+      },
+      placed,
+      index
+    );
+    placed.push({ scene, point });
+  });
+  return placed;
+}
+
+function resolvePanoramaMapPointCollision(point, placed, index) {
+  const minDistance = 24;
+  const candidates = [point];
+  const radii = [14, 22, 30, 38, 46];
+  radii.forEach((radius) => {
+    for (let step = 0; step < 8; step += 1) {
+      const angle = ((step / 8) * Math.PI * 2) + (index * 0.72);
+      candidates.push({
+        x: clampMapPercent(point.x + Math.cos(angle) * radius, 8, 92),
+        y: clampMapPercent(point.y + Math.sin(angle) * radius, 12, 88),
+      });
+    }
+  });
+  return candidates.find((candidate) => placed.every((item) => panoramaMapPointDistance(candidate, item.point) >= minDistance)) || candidates[candidates.length - 1];
+}
+
+function panoramaMapPointDistance(a, b) {
+  const dx = (Number(a?.x) - Number(b?.x)) * 0.68;
+  const dy = Number(a?.y) - Number(b?.y);
+  return Math.sqrt((dx * dx) + (dy * dy));
+}
+
+function clampMapPercent(value, min, max) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return (min + max) / 2;
+  }
+  return Math.max(min, Math.min(max, numberValue));
 }
 
 function getFloorPlanSceneMapPoint(scene) {
@@ -6762,7 +7099,7 @@ function renderVersionPane(sample) {
     const title = document.createElement("strong");
     title.textContent = version.createdAt;
     const summary = document.createElement("p");
-    const qualityLabel = version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿";
+    const qualityLabel = sample.previewOnly ? "效果图初稿" : version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿";
     summary.textContent = version.adjustments?.length
       ? `${qualityLabel}，应用 ${version.adjustments.length} 条调整，${version.scenes.length} 个场景。`
       : `${qualityLabel}，未额外调整，${version.scenes.length} 个场景。`;
