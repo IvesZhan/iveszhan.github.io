@@ -994,6 +994,8 @@ const floorPreviewVisibleBoundsPaddingRatio = 0.08;
 
 let activeTab = "samples";
 let hasOpenedRequestedProject = false;
+// Preserve explicit visitor choices, never a stale static manifest's default.
+const selectedProjectVersions = new Map();
 let activeSampleId = availableSamples[0]?.id || "";
 let activeRoomId = availableSamples[0]?.rooms?.[0]?.id || "";
 let activeAdjustSceneId = "";
@@ -1117,11 +1119,15 @@ function openRequestedProject() {
   const sample = availableSamples.find((item) => item.id === requestedId);
   if (!sample) return;
   const version = sample.versions?.find((item) => item.id === query.get("version"));
-  if (version) sample.activeVersionId = version.id;
+  if (version) {
+    sample.activeVersionId = version.id;
+    selectedProjectVersions.set(sample.id, version.id);
+  }
   activeSampleId = sample.id;
   activeRoomId = getPreviewScenes(sample)[0]?.id || "";
   activeAdjustSceneId = getAdjustableScenes(sample)[0]?.id || "";
-  hasOpenedRequestedProject = true;
+  // A newer deep-linked version may only arrive with the cloud project record.
+  hasOpenedRequestedProject = !query.get("version") || Boolean(version);
   renderSampleList();
   renderScheme();
   setSchemePane(version ? "preview" : getPreferredSchemePaneForSample(sample));
@@ -1422,7 +1428,7 @@ function normalizeSampleState(sample) {
 
 async function loadPublishedProjectSamples() {
   const results = await Promise.allSettled((APP_CONFIG.publishedProjects || []).map(async (url) => {
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: "no-cache" });
     if (!response.ok) throw new Error(`无法读取已发布方案：${url}`);
     const sample = createSampleFromPersistedProject(await response.json());
     if (sample) sample.persisted = false;
@@ -1459,9 +1465,9 @@ async function loadPersistedProjectSamples() {
       .map(createSampleFromPersistedProject)
       .filter(Boolean)
       .map((sample) => {
-        const previous = availableSamples.find((item) => item.id === sample.id);
-        if (sample.versions.some((version) => version.id === previous?.activeVersionId)) {
-          sample.activeVersionId = previous.activeVersionId;
+        const selectedVersionId = selectedProjectVersions.get(sample.id);
+        if (sample.versions.some((version) => version.id === selectedVersionId)) {
+          sample.activeVersionId = selectedVersionId;
         }
         return sample;
       });
@@ -1541,6 +1547,7 @@ function normalizePersistedVersion(version) {
     title: version.title,
     status: version.status,
     qualityStatus: version.quality_status || "draft",
+    previewLabel: version.previewLabel || version.preview_label || "",
     deliverable: Boolean(version.deliverable),
     createdAt: version.created_at || "已保存",
     summary: version.summary || "",
@@ -2880,6 +2887,7 @@ function saveTemplateEditIntent(sample) {
 
   sample.versions = [...(sample.versions || []), version];
   sample.activeVersionId = version.id;
+  selectedProjectVersions.set(sample.id, version.id);
   sample.status = "模板库 · 已记录修改意图";
   sample.adjustments = [];
   setRenderStatus({
@@ -2961,6 +2969,7 @@ function applyVersionToSample(sample, version, result = {}) {
   }
   sample.versions = [...(sample.versions || []), version];
   sample.activeVersionId = version.id;
+  selectedProjectVersions.set(sample.id, version.id);
   sample.status = `${version.title} · 已生成`;
   sample.delivery = isRealPanoramaPackage(version.vrPackage) || version.deliverable ? "真实 2:1 VR全景" : "不可交付预览";
   sample.rooms = version.scenes;
@@ -5392,7 +5401,7 @@ function renderSampleList() {
           <span class="status-pill">${sample.status}</span>
         </span>
         <span class="project-body">
-          <span class="project-eyebrow">${sample.delivery}</span>
+          <span class="project-eyebrow">${getActiveVersion(sample)?.previewLabel || sample.delivery}</span>
           <span class="project-title-line">
             <strong>${sample.name}</strong>
             <small>${sample.title}</small>
@@ -5564,7 +5573,7 @@ function renderScheme() {
   detailSummary.textContent = [room?.description, activeVersion?.summary || sample.summary].filter(Boolean).join(" ");
   detailArea.textContent = sample.area;
   detailStyle.textContent = sample.style;
-  detailDelivery.textContent = previewVrAvailable ? "VR全景方案" : activeVersion ? "效果图预览" : "第一版生成中";
+  detailDelivery.textContent = previewVrAvailable ? "VR全景方案" : activeVersion ? (activeVersion.previewLabel || "效果图预览") : "第一版生成中";
   renderPreviewFloorPlan(sample, activeVersion);
 
   renderSceneTabs(detailRoomTabs, previewVrAvailable ? [] : scenes, activeRoomId, (sceneId) => {
@@ -5605,7 +5614,9 @@ function getProjectSceneCount(sample) {
 }
 
 function getAdjustableScenes(sample) {
-  const source = sample.plannedScenes?.length ? sample.plannedScenes : getPreviewScenes(sample);
+  const activeVersion = getActiveVersion(sample);
+  const source = activeVersion?.scenes?.length ? activeVersion.scenes
+    : sample.plannedScenes?.length ? sample.plannedScenes : getPreviewScenes(sample);
   return source.filter((scene) => scene.adjustable !== false);
 }
 
@@ -6031,7 +6042,7 @@ function renderAdjustPanel(sample) {
     } else if (activeVersion?.deliverable) {
       adjustScope.textContent = `正在基于当前终版继续调整 ${scene.name}，重新生成后会记录为下一版 VR 全景方案。`;
     } else if (sample.previewOnly) {
-      adjustScope.textContent = `当前为 ${scene.name} 的概念效果初稿；可记录调整想法，自动重新生成需接入相应生成服务。`;
+      adjustScope.textContent = `当前为 ${scene.name} 的${activeVersion?.previewLabel || "概念效果初稿"}；可记录调整想法，自动重新生成需接入相应生成服务。`;
     } else if (activeVersion) {
       adjustScope.textContent = `当前版本缺少真实 2:1 全景生成来源，不能继续生成客户可交付版本。`;
     } else {
@@ -7162,13 +7173,14 @@ function renderVersionPane(sample) {
     const title = document.createElement("strong");
     title.textContent = version.createdAt;
     const summary = document.createElement("p");
-    const qualityLabel = sample.previewOnly ? "效果图初稿" : version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿";
+    const qualityLabel = version.previewLabel || (sample.previewOnly ? "效果图初稿" : version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿");
     summary.textContent = version.adjustments?.length
       ? `${qualityLabel}，应用 ${version.adjustments.length} 条调整，${version.scenes.length} 个场景。`
       : `${qualityLabel}，未额外调整，${version.scenes.length} 个场景。`;
     card.append(label, title, summary);
     card.addEventListener("click", () => {
       sample.activeVersionId = version.id;
+      selectedProjectVersions.set(sample.id, version.id);
       activeRoomId = version.scenes[0]?.id || activeRoomId;
       activeAdjustSceneId = version.scenes[0]?.id || activeAdjustSceneId;
       renderScheme();
