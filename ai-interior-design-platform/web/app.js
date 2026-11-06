@@ -558,7 +558,7 @@ function isUserVisibleProjectSample(sample) {
   return scenes.every((scene) => {
     const provider = scene.source_provider || scene.sourceProvider || "";
     const qualityStatus = normalizeQualityStatus(scene.quality_status || scene.qualityStatus);
-    return isRealPanoramaProvider(provider) && scene.deliverable !== false && qualityStatus === "production";
+    return isRealPanoramaProvider(provider) && scene.deliverable === true && qualityStatus === "production";
   });
 }
 
@@ -1069,7 +1069,46 @@ renderScheme();
 updateGenerateState();
 setTab(activeTab);
 openRequestedProject();
-loadPublishedProjectSamples().then(loadPersistedProjectSamples);
+loadPublishedProjectSamples().then(loadPersistedProjectSamples).then(resumeCloudGeneration);
+
+function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers);
+  if (APP_CONFIG.api.cloudAuth) {
+    const token = window.sessionStorage.getItem("xspace-cloud-session");
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(url, { ...options, headers }).then((response) => {
+    if (APP_CONFIG.api.cloudAuth && response.status === 401) {
+      window.sessionStorage.removeItem("xspace-cloud-session");
+      isAccountLoggedIn = false;
+      applyAuthState();
+      openLoginDialog(activeTab);
+    }
+    return response;
+  });
+}
+
+async function resumeCloudGeneration() {
+  if (!APP_CONFIG.api.cloudAuth || !window.sessionStorage.getItem("xspace-cloud-session")) return;
+  try {
+    const response = await apiFetch(`${getApiBaseUrl()}/api/v1/panorama-generation/jobs`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    const pending = (payload.jobs || []).find((job) => ["queued", "running"].includes(job.status));
+    if (!pending) return;
+    currentRenderJobId = pending.job_id;
+    setInitialPanoramaJobProgressStatus(pending);
+    const result = await pollPanoramaGenerationJob(getApiBaseUrl(), pending.job_id, setInitialPanoramaJobProgressStatus);
+    await loadPersistedProjectSamples();
+    if (result.persisted_project_id && availableSamples.some((sample) => sample.id === result.persisted_project_id)) {
+      activeSampleId = result.persisted_project_id;
+      renderSampleList(); renderScheme(); setTab("scheme-detail");
+    }
+    setGenerationStatus({ status: "complete", title: "云端方案已生成", messages: ["新版本已保存到方案库。"] });
+  } catch (error) {
+    setGenerationStatus({ status: "error", title: "云端生成未完成", messages: [formatGenerationError(error)] });
+  }
+}
 
 function openRequestedProject() {
   if (hasOpenedRequestedProject) return;
@@ -1098,6 +1137,7 @@ function resolveAccountRole() {
 }
 
 function resolveAccountLoginState() {
+  if (APP_CONFIG.api.cloudAuth) return Boolean(window.sessionStorage.getItem("xspace-cloud-session"));
   const queryAuth = new URLSearchParams(window.location.search).get("auth");
   const storedAuth = window.localStorage.getItem(authStateStorageKey);
   if (queryAuth === "logged-out") {
@@ -1218,6 +1258,7 @@ function persistPicWishAccount(data) {
 }
 
 function clearPicWishAccount() {
+  window.sessionStorage.removeItem("xspace-cloud-session");
   isAccountLoggedIn = false;
   accountProfile = {};
   window.localStorage.removeItem(authStateStorageKey);
@@ -1268,7 +1309,7 @@ async function handleLoginSubmit(event) {
     return;
   }
 
-  const endpoint = getLoginEndpoint();
+  const endpoint = APP_CONFIG.api.cloudAuth ? `${getApiBaseUrl()}/api/v1/auth/login` : getLoginEndpoint();
   if (!endpoint) {
     setLoginStatus("登录接口待接入，收到接口后会在这里提交账号密码。");
     return;
@@ -1294,10 +1335,15 @@ async function handleLoginSubmit(event) {
       }),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.status !== 200 || !payload?.data?.api_token) {
+    if (APP_CONFIG.api.cloudAuth) {
+      if (!response.ok || !payload.token) throw new Error(payload.detail || "云端登录失败。");
+      window.sessionStorage.setItem("xspace-cloud-session", payload.token);
+      accountProfile = payload.profile || {};
+      window.localStorage.setItem(authStateStorageKey, "signed-in");
+      window.localStorage.setItem(accountProfileStorageKey, JSON.stringify(accountProfile));
+    } else if (!response.ok || payload?.status !== 200 || !payload?.data?.api_token) {
       throw new Error(payload?.message || payload?.detail || "登录失败，请检查账号和密码。");
-    }
-    persistPicWishAccount(payload.data);
+    } else persistPicWishAccount(payload.data);
     isAccountLoggedIn = true;
     applyAuthState();
     const targetTab = pendingLoginTab;
@@ -1305,6 +1351,7 @@ async function handleLoginSubmit(event) {
     if (targetTab) {
       setTab(targetTab);
     }
+    if (APP_CONFIG.api.cloudAuth) resumeCloudGeneration();
   } catch (error) {
     setLoginStatus(error.message || "登录失败，请稍后重试。");
   } finally {
@@ -1339,13 +1386,12 @@ function normalizeSampleState(sample) {
     shot_type: "panorama",
     projection: "equirectangular",
     source_provider: scene.source_provider || scene.sourceProvider || "provided_panorama_asset",
-    quality_status: scene.quality_status || scene.qualityStatus || "production",
-    deliverable: scene.deliverable ?? true,
+    quality_status: scene.quality_status || scene.qualityStatus || "draft",
+    deliverable: scene.deliverable === true,
   }));
   const realPanorama = panoramaScenes.some((scene) => isRealPanoramaProvider(scene.source_provider || scene.sourceProvider));
-  const deliverable = realPanorama || (panoramaScenes.length
-    ? panoramaScenes.every((scene) => scene.deliverable && normalizeQualityStatus(scene.quality_status) === "production")
-    : true);
+  const deliverable = panoramaScenes.length > 0
+    && panoramaScenes.every((scene) => scene.deliverable && normalizeQualityStatus(scene.quality_status) === "production");
   const qualityStatus = deliverable ? "production" : "draft";
   const version = {
     id: `final-${sample.id}-v1`,
@@ -1951,7 +1997,7 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
   formData.append("brief_text", buildDesignBriefText(file, effectiveStylePackage));
   formData.append("generation_intent", JSON.stringify(buildGenerationIntent(file, effectiveStyleId, effectiveStylePackage)));
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, {
+  const response = await apiFetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, {
     method: "POST",
     body: formData,
   });
@@ -1973,7 +2019,7 @@ async function renderRealPanoramaVersionWithBackend(sample, onProgress = () => {
     throw new Error("当前方案没有配置真实全景生成来源。");
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs`, {
+  const response = await apiFetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1985,11 +2031,13 @@ async function renderRealPanoramaVersionWithBackend(sample, onProgress = () => {
       max_scenes: options.maxScenes || config.maxScenes || 4,
       level: config.level || 2,
       output_width: config.outputWidth || 2048,
-      timeout: config.timeout || (["structure_first_pipeline", "ai_panorama_renderer"].includes(config.sourceProvider) ? 1800 : 20),
+      timeout: config.timeout || (["kujiale_ai_design", "structure_first_pipeline", "ai_panorama_renderer"].includes(config.sourceProvider) ? 1800 : 20),
       rooms: Array.isArray(options.rooms) ? options.rooms : (Array.isArray(config.rooms) ? config.rooms : undefined),
       render_spec: getBaseRenderSpecForFinalGeneration(sample),
       adjustments: Array.isArray(options.adjustments) ? options.adjustments : sample.adjustments || [],
-      picwish_authorization: getPicWishAuthorization(),
+      project_snapshot: APP_CONFIG.api.cloudAuth ? serializeProjectForPersistence(sample) : undefined,
+      base_version_id: getActiveVersion(sample)?.id || "",
+      picwish_authorization: APP_CONFIG.api.cloudAuth ? undefined : getPicWishAuthorization(),
     }),
   });
   if (!response.ok) {
@@ -2043,7 +2091,7 @@ async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
 
   while (true) {
     await wait(1000);
-    const response = await fetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs/${encodeURIComponent(jobId)}`);
+    const response = await apiFetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs/${encodeURIComponent(jobId)}`);
     if (!response.ok) {
       throw new Error(await readApiError(response));
     }
@@ -2054,6 +2102,7 @@ async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
     if (job.status === "complete") {
       return {
         status: "complete",
+        persisted_project_id: job.persisted_project_id || "",
         version_id: job.version_id,
         scenes: [],
         vr_package: job.vr_package || null,
@@ -2707,6 +2756,7 @@ function normalizePanoramaSourceImageUrl(value) {
 }
 
 function mergeRoomRegenerationResult(sample, result, targetScene) {
+  if (result.persisted_project_id) return result;
   const activeVersion = getActiveVersion(sample);
   const basePackage = activeVersion?.vrPackage || buildVrPackageFromScenes(sample, activeVersion?.scenes || [], activeVersion?.id || "");
   const generatedScene = result.vr_package?.scenes?.[0] || result.scenes?.[0];
@@ -2769,7 +2819,7 @@ async function confirmAndStopRender() {
     if (!currentRenderJobId.startsWith("pano-")) {
       throw new Error("当前任务不是生产级真实全景生成任务，无法执行停止操作。");
     }
-    const response = await fetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs/${encodeURIComponent(currentRenderJobId)}/cancel`, {
+    const response = await apiFetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs/${encodeURIComponent(currentRenderJobId)}/cancel`, {
       method: "POST",
     });
     if (!response.ok) {
@@ -2963,12 +3013,12 @@ function normalizeVrPackage(vrPackage, sample, versionNumber) {
         ? `真实全景资源 V${versionNumber}`
         : `不可交付预览 V${versionNumber}`,
     scenes: (vrPackage.scenes || []).map((scene, index) => normalizeVrScene({ ...scene, name: formatGeneratedSceneName(scene, index) }, sample)),
-    floorMapPoints: vrPackage.floor_map_points || [],
-    shareMeta: vrPackage.share_meta || {},
+    floorMapPoints: vrPackage.floor_map_points || vrPackage.floorMapPoints || [],
+    shareMeta: vrPackage.share_meta || vrPackage.shareMeta || {},
     sourceProvider,
     qualityStatus,
-    deliverable: realPanorama || (Boolean(vrPackage.deliverable || vrPackage.share_meta?.deliverable) && qualityStatus === "production"),
-    productionBlockers: realPanorama ? [] : (vrPackage.production_blockers || vrPackage.productionBlockers || []),
+    deliverable: vrPackage.deliverable === true && qualityStatus === "production",
+    productionBlockers: vrPackage.production_blockers || vrPackage.productionBlockers || [],
   };
 }
 
@@ -2977,7 +3027,7 @@ function buildVrPackageFromScenes(sample, scenes, versionId) {
     .filter((scene) => scene.shot_type === "panorama" && scene.image)
     .map((scene) => normalizeVrScene(scene, sample));
   const realPanorama = panoramaScenes.some((scene) => isRealPanoramaProvider(scene.sourceProvider));
-  const deliverable = realPanorama || (panoramaScenes.length > 0 && panoramaScenes.every((scene) => scene.deliverable && scene.qualityStatus === "production"));
+  const deliverable = panoramaScenes.length > 0 && panoramaScenes.every((scene) => scene.deliverable && scene.qualityStatus === "production");
   const realProvider = panoramaScenes.find((scene) => isRealPanoramaProvider(scene.sourceProvider))?.sourceProvider || "provided_panorama_asset";
   const qualityStatus = deliverable ? "production" : "draft";
   return {
@@ -3030,15 +3080,15 @@ function normalizeVrScene(scene, sample) {
     poster: scene.poster_url || scene.poster || scene.thumb_url || scene.preview || scene.panorama_url || scene.image,
     alt: `${sample.name} ${name} VR 全景`,
     shot_type: "panorama",
-    projection: scene.projection || "equirectangular",
-    width: scene.width || vrPreviewPanoramaWidth,
-    height: scene.height || vrPreviewPanoramaHeight,
+    projection: scene.projection || "",
+    width: Number(scene.width) || 0,
+    height: Number(scene.height) || 0,
     hotspots: [],
     sourceProvider: scene.source_provider || scene.sourceProvider || "",
     providerTaskId: scene.provider_task_id || scene.providerTaskId || "",
     sourceResourceIds: scene.source_resource_ids || scene.sourceResourceIds || [],
-    qualityStatus: isRealPanoramaProvider(scene.source_provider || scene.sourceProvider) ? "production" : qualityStatus,
-    deliverable: isRealPanoramaProvider(scene.source_provider || scene.sourceProvider) || (Boolean(scene.deliverable) && qualityStatus === "production"),
+    qualityStatus,
+    deliverable: scene.deliverable === true && qualityStatus === "production",
     qualityNotes: scene.quality_notes || scene.qualityNotes || [],
   };
 }
@@ -3071,15 +3121,21 @@ function normalizeQualityStatus(value) {
 
 function isDeliverableVrPackage(vrPackage) {
   const locallyAcceptable = isVrPackageLocallyAcceptable(vrPackage);
-  return locallyAcceptable && (isRealPanoramaPackage(vrPackage) || (Boolean(vrPackage?.deliverable) && vrPackage.qualityStatus === "production"));
+  return locallyAcceptable && vrPackage?.deliverable === true
+    && vrPackage.qualityStatus === "production"
+    && !(vrPackage.productionBlockers || []).length
+    && vrPackage.scenes.every((scene) => scene.deliverable === true && scene.qualityStatus === "production");
 }
 
 function isVrPackageLocallyAcceptable(vrPackage) {
   const scenes = vrPackage?.scenes || [];
   if (!scenes.length) {
-    return true;
+    return false;
   }
-  return scenes.every((scene) => getSceneVrQualityReport(scene).status !== "review_required");
+  return scenes.every((scene) => scene.projection === "equirectangular"
+    && Number(scene.width) > 0 && Number(scene.height) > 0
+    && Number(scene.width) === Number(scene.height) * 2
+    && getSceneVrQualityReport(scene).status !== "review_required");
 }
 
 function isRealPanoramaPackage(vrPackage) {
@@ -3088,7 +3144,7 @@ function isRealPanoramaPackage(vrPackage) {
 }
 
 function isRealPanoramaProvider(provider) {
-  return ["provided_panorama_asset", "structure_first_pipeline", "ai_panorama_renderer"].includes(provider);
+  return ["provided_panorama_asset", "kujiale_ai_design", "structure_first_pipeline", "ai_panorama_renderer"].includes(provider);
 }
 
 function canGenerateRealPanoramas(sample) {
@@ -3100,7 +3156,7 @@ function getVrQualityLabel(vrPackage) {
     return "可交付 VR 全景";
   }
   if (isRealPanoramaPackage(vrPackage)) {
-    return "可交付 VR 全景";
+    return "全景参考";
   }
   if (vrPackage?.qualityStatus === "review_required") {
     return "可查看 VR 全景";
@@ -3509,7 +3565,7 @@ async function extractEffectBriefWithApi(file, apiBaseUrl) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/import/effect-brief/extract`, {
+  const response = await apiFetch(`${apiBaseUrl}/api/v1/import/effect-brief/extract`, {
     method: "POST",
     body: formData,
   });
@@ -4092,7 +4148,7 @@ async function validateFloorFileWithApi(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${getApiBaseUrl()}/api/v1/import/floor-plan/check`, {
+  const response = await apiFetch(`${getApiBaseUrl()}/api/v1/import/floor-plan/check`, {
     method: "POST",
     body: formData,
   });
@@ -4127,7 +4183,7 @@ async function renderApiFloorPreview(file, runId) {
     formData.append("file", file);
     formData.append("style", selectedStyleId || "cream");
 
-    const response = await fetch(`${getApiBaseUrl()}/api/v1/projects/from-dxf`, {
+    const response = await apiFetch(`${getApiBaseUrl()}/api/v1/projects/from-dxf`, {
       method: "POST",
       body: formData,
     });
@@ -4185,6 +4241,13 @@ async function readApiError(response) {
 
 async function persistProjectVersion(sample, version, result = {}) {
   const apiBaseUrl = getApiBaseUrl();
+  if (result.persisted_project_id) {
+    const response = await apiFetch(`${apiBaseUrl}/api/v1/projects/${encodeURIComponent(result.persisted_project_id)}`);
+    if (!response.ok) throw new Error("云端版本已保存，暂时无法读取，请刷新方案库。");
+    const record = await response.json();
+    Object.assign(sample, createSampleFromPersistedProject(record));
+    return record;
+  }
   if (!apiBaseUrl || !sample?.id || !version?.id) {
     throw new Error("方案已生成，但缺少后端地址或方案版本信息，无法同步到全局方案库。");
   }
