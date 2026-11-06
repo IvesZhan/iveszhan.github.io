@@ -2090,7 +2090,7 @@ async function pollPanoramaGenerationJob(apiBaseUrl, jobId, onProgress) {
   }
 
   while (true) {
-    await wait(1000);
+    await wait(APP_CONFIG.api.cloudAuth ? 3000 : 1000);
     const response = await apiFetch(`${apiBaseUrl}/api/v1/panorama-generation/jobs/${encodeURIComponent(jobId)}`);
     if (!response.ok) {
       throw new Error(await readApiError(response));
