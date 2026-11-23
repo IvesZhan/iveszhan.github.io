@@ -9,6 +9,7 @@
       content="交换空间设计平台，用于管理、生成和交付家装空间方案。"
     />
     <link rel="stylesheet" href="./styles.css?v=vr-map-switch-fix-4" />
+      <link rel="stylesheet" href="./layout-review/workspace.css?v=20261123" />
   </head>
   <body data-role="client">
     <header class="app-header">
@@ -106,6 +107,7 @@
           </div>
           <nav class="scheme-tabs" aria-label="方案内部导航">
             <button class="is-active" type="button" data-scheme-tab="preview">预览</button>
+            <button type="button" data-scheme-tab="layout" hidden>3D 校对</button>
             <button type="button" data-scheme-tab="adjust">调整</button>
             <button type="button" data-scheme-tab="versions" data-final-only>版本</button>
           </nav>
@@ -156,6 +158,10 @@
               <div class="preview-floor-plan" data-preview-floor-plan aria-label="户型图"></div>
             </aside>
           </div>
+        </div>
+
+        <div class="scheme-pane" data-scheme-pane="layout">
+          <div data-scheme-layout-review></div>
         </div>
 
         <div class="scheme-pane" data-scheme-pane="adjust">
@@ -314,10 +320,10 @@
                 <div class="floor-upload-module floor-file-module">
                   <strong>图纸文件</strong>
                   <label class="upload-zone">
-                    <input type="file" accept=".dxf,.dwg" data-import-step="floor" />
+                    <input type="file" accept=".dxf,.dwg,.json,.roomplan" data-import-step="floor" />
                     <span data-upload-label>上传图纸</span>
                   </label>
-                  <small>支持 DXF / DWG，单位 mm，1:1。</small>
+                  <small>支持毫米制 DXF / DWG，以及 RoomPlan / OpenPlan3D 的 LiDAR JSON。</small>
                 </div>
                 <div class="floor-upload-module effect-brief-module">
                   <div class="effect-brief-controls">
@@ -334,9 +340,11 @@
                 </div>
               </div>
               <div class="file-validation" data-floor-validation aria-live="polite"></div>
+              <button class="layout-action" type="button" data-open-import-layout hidden>打开 3D 户型校对</button>
             </div>
           </section>
         </div>
+        <div data-import-layout-review hidden></div>
       </section>
 
     </main>
@@ -360,6 +368,6 @@
       </section>
     </div>
 
-    <script src="./app.js?v=jindi-layout-preview-v3-20261106" type="module"></script>
+    <script src="./app.js?v=jindi-layout-review-v5-20261123" type="module"></script>
   </body>
 </html>

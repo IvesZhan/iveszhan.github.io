@@ -1,0 +1,22 @@
+Bundled license information:
+
+react/cjs/react.production.js:
+  /**
+   * @license React
+   * react.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+splaytree/dist/splaytree.js:
+  /**
+   * splaytree v3.2.4
+   * Fast Splay tree for Node and browser
+   *
+   * @author Alexander Milevski <alex@milevski.co>
+   * @license MIT
+   * @preserve
+   */

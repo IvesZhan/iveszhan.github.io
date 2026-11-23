@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "./config.js?v=cloudflare-20261106";
+import { loadLayoutScene, toFloorPlan } from "./layout-review/scene.js";
 
 const samples = [
   {
@@ -913,7 +914,8 @@ const effectBriefStyleSignals = {
   industrial: ["工业", "水泥", "黑铁", "裸露", "loft"],
   american: ["美式", "护墙板", "壁炉", "复古皮革", "壁灯"],
 };
-const acceptedFloorExtensions = [".dxf", ".dwg"];
+const lidarFloorExtensions = [".json", ".roomplan"];
+const acceptedFloorExtensions = [".dxf", ".dwg", ...lidarFloorExtensions];
 const requiredFloorLayerRules = [
   {
     key: "wall",
@@ -1005,6 +1007,16 @@ let styleSearchQuery = "";
 let floorValidationState = { status: "empty", title: "", messages: [] };
 let floorValidationRunId = 0;
 let selectedFloorFile = null;
+let importedLayout = null;
+let importedLayoutDraft = null;
+let activeImportLayout = null;
+let activeSchemeLayout = null;
+let activeSchemeLayoutKey = "";
+const schemeLayoutDrafts = new Map();
+let layoutLoadSequence = 0;
+const importLayoutButton = document.querySelector("[data-open-import-layout]");
+const importLayoutHolder = document.querySelector("[data-import-layout-review]");
+const schemeLayoutHolder = document.querySelector("[data-scheme-layout-review]");
 let selectedStyleId = "";
 let effectBriefDocument = null;
 let isEditingEffectBrief = false;
@@ -1130,7 +1142,7 @@ function openRequestedProject() {
   hasOpenedRequestedProject = !query.get("version") || Boolean(version);
   renderSampleList();
   renderScheme();
-  setSchemePane(version ? "preview" : getPreferredSchemePaneForSample(sample));
+  setSchemePane(query.get("view") === "layout" && getActiveVersion(sample)?.layoutScene ? "layout" : version ? "preview" : getPreferredSchemePaneForSample(sample));
   setTab("scheme-detail");
 }
 loadStaticPanoramaTemplateSamples();
@@ -1465,6 +1477,17 @@ async function loadPersistedProjectSamples() {
       .map(createSampleFromPersistedProject)
       .filter(Boolean)
       .map((sample) => {
+        const published = availableSamples.find((item) => item.id === sample.id && !item.persisted);
+        if (published) {
+          const serverVersionIds = new Set(sample.versions.map((version) => version.id));
+          const serverVersionNumbers = new Set(sample.versions.map((version) => version.number));
+          const newerPublished = published.versions.filter((version) => !serverVersionIds.has(version.id) && !serverVersionNumbers.has(version.number));
+          const latestServerNumber = Math.max(0, ...serverVersionNumbers);
+          sample.versions = [...sample.versions, ...newerPublished].sort((a, b) => a.number - b.number);
+          if (newerPublished.some((version) => version.id === published.activeVersionId && version.number > latestServerNumber)) {
+            sample.activeVersionId = published.activeVersionId;
+          }
+        }
         const selectedVersionId = selectedProjectVersions.get(sample.id);
         if (sample.versions.some((version) => version.id === selectedVersionId)) {
           sample.activeVersionId = selectedVersionId;
@@ -1558,6 +1581,7 @@ function normalizePersistedVersion(version) {
     renderSpec: version.render_spec || null,
     generationJobId: version.generation_job_id || "",
     qualityReport: version.quality_report || null,
+    layoutScene: version.layoutScene || version.layout_scene || null,
   };
 }
 
@@ -1870,6 +1894,10 @@ function bindImportWorkflow() {
     }
   });
 
+  importLayoutButton?.addEventListener("click", () => openImportedLayout().catch((error) => {
+    importLayoutHolder.hidden = false;
+    importLayoutHolder.textContent = error?.message || "暂时无法打开 3D 校对。";
+  }));
   generateButton?.addEventListener("click", handleGeneratePlan);
   renderFinalButton?.addEventListener("click", handleRenderFinalVersion);
   clearAdjustmentsButton?.addEventListener("click", clearCurrentAdjustments);
@@ -1932,7 +1960,7 @@ async function handleGeneratePlan() {
     setGenerationStatus({
       status: "error",
       title: "方案生成失败",
-      messages: ["请先上传并通过校验一份 DXF / DWG 户型图，再选择风格生成方案。"],
+      messages: ["请先上传并通过校验一份户型图，再选择风格生成方案。"],
     });
     return;
   }
@@ -1996,18 +2024,30 @@ async function createProjectDraftFromBackend(file, styleId, stylePackage) {
     throw new Error("未配置本地后端地址，无法生成第一版方案。");
   }
 
-  const formData = new FormData();
   const effectiveStyleId = stylePackages[styleId] ? styleId : (effectBriefDocument?.parsed?.styleId || "cream");
   const effectiveStylePackage = stylePackages[effectiveStyleId] || stylePackage;
-  formData.append("file", file);
-  formData.append("style", effectiveStyleId);
-  formData.append("brief_text", buildDesignBriefText(file, effectiveStylePackage));
-  formData.append("generation_intent", JSON.stringify(buildGenerationIntent(file, effectiveStyleId, effectiveStylePackage)));
-
-  const response = await apiFetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, {
-    method: "POST",
-    body: formData,
-  });
+  const briefText = buildDesignBriefText(file, effectiveStylePackage);
+  const intent = buildGenerationIntent(file, effectiveStyleId, effectiveStylePackage);
+  let response;
+  if (importedLayout && lidarFloorExtensions.includes(getFileExtension(file.name))) {
+    const model = importedLayoutDraft || importedLayout.scene;
+    if (!model.rooms.length) throw new Error("导入的扫描缺少可用于生成的封闭房间。请补齐户型轮廓后再生成。");
+    const capabilities = await apiFetch(`${apiBaseUrl}/api/v1/design-generation-capabilities`).then((result) => result.ok ? result.json() : null);
+    if (capabilities?.generation_available === false) {
+      throw new Error("云端渲染尚未开放。已导入的户型可以打开 3D 校对、运行空间检查并保存草稿。");
+    }
+    response = await apiFetch(`${apiBaseUrl}/api/v1/projects/from-layout`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ floor_plan: toFloorPlan(model), style: effectiveStyleId, brief_text: briefText, generation_intent: intent }),
+    });
+  } else {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("style", effectiveStyleId);
+    formData.append("brief_text", briefText);
+    formData.append("generation_intent", JSON.stringify(intent));
+    response = await apiFetch(`${apiBaseUrl}/api/v1/projects/from-dxf`, { method: "POST", body: formData });
+  }
 
   if (!response.ok) {
     throw new Error(await readApiError(response));
@@ -4014,6 +4054,61 @@ function formatMillimeters(value) {
   return `${Math.round(Number(value))}mm`;
 }
 
+function clearImportedLayout() {
+  importedLayout = null;
+  importedLayoutDraft = null;
+  activeImportLayout?.dispose();
+  activeImportLayout = null;
+  importLayoutButton.hidden = true;
+  importLayoutHolder.hidden = true;
+}
+
+async function openImportedLayout() {
+  const current = importedLayout;
+  if (!current) return;
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js");
+  if (current !== importedLayout) return;
+  importLayoutHolder.hidden = false;
+  if (!activeImportLayout) {
+    activeImportLayout = createLayoutWorkspace(importLayoutHolder, { source: current.scene, key: current.key,
+      onSceneChange(scene) { if (current === importedLayout) importedLayoutDraft = scene; } });
+  }
+  importLayoutHolder.scrollIntoView({ block: "nearest" });
+}
+
+async function importLidarFloor(file, runId) {
+  try {
+    if (file.size > 8 * 1024 * 1024) throw new Error("请导入不超过 8 MB 的单层户型 JSON。");
+    const { parseRoomPlan } = await import("./layout-review/roomplan.js");
+    const content = await file.text();
+    let data;
+    try { data = JSON.parse(content); }
+    catch { throw new Error("无法读取户型 JSON，请重新导出可编辑户型数据。"); }
+    const scene = loadLayoutScene(data.schema === "layout-review/v1" ? data : parseRoomPlan(data, { name: file.name.replace(/\.[^.]+$/, "") }));
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+    const key = `import:${Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("")}`;
+    if (runId !== floorValidationRunId) return;
+    const { readLayoutDraft } = await import("./layout-review/workspace.js");
+    if (runId !== floorValidationRunId) return;
+    importedLayout = { scene, key };
+    importedLayoutDraft = readLayoutDraft(key) || scene;
+    importState.floor = Boolean(scene.rooms.length);
+    selectedFloorFile = file;
+    importLayoutButton.hidden = false;
+    const roomCount = scene.rooms.length;
+    setFloorValidation({ status: roomCount ? "valid" : "invalid", title: "已读取 LiDAR 户型",
+      messages: [`${roomCount} 个封闭空间 · ${scene.walls.length} 段墙体 · ${scene.items.length} 件家具`,
+        ...(roomCount ? [] : ["当前可校对墙体，生成空间方案前需补齐房间轮廓。"])] });
+    renderFloorPreview(buildDrawingFromFloorPlan(toFloorPlan(scene)), file.name);
+  } catch (error) {
+    if (runId !== floorValidationRunId) return;
+    selectedFloorFile = null;
+    setFloorValidation({ status: "invalid", title: "无法导入 LiDAR 户型", messages: [error?.message || "请检查户型文件。"] });
+    clearFloorPreview();
+  }
+  updateGenerateState();
+}
+
 async function validateFloorFile(input, files = input.files) {
   const file = files[0];
   if (!file && selectedFloorFile) {
@@ -4023,6 +4118,7 @@ async function validateFloorFile(input, files = input.files) {
 
   const extension = getFileExtension(file?.name ?? "");
   const runId = ++floorValidationRunId;
+  clearImportedLayout();
 
   updateUploadLabel(input, files);
   importState.floor = false;
@@ -4057,6 +4153,11 @@ async function validateFloorFile(input, files = input.files) {
     });
     clearFloorPreview();
     updateGenerateState();
+    return;
+  }
+
+  if (lidarFloorExtensions.includes(extension)) {
+    await importLidarFloor(file, runId);
     return;
   }
 
@@ -4141,7 +4242,7 @@ function validateFloorFileFormat(file) {
     return errors;
   }
 
-  errors.push("文件格式不符合要求，请上传 .dxf 或 .dwg 户型文件。");
+  errors.push("请上传 DXF、DWG 或 RoomPlan / OpenPlan3D 的户型 JSON。");
   return errors;
 }
 
@@ -5316,6 +5417,8 @@ function setTab(tab) {
   }
 
   activeTab = nextTab;
+  if (nextTab !== "scheme-detail") closeSchemeLayout();
+  if (nextTab === "scheme-detail" && getActiveSchemePane() === "layout") setSchemePane("layout");
 
   panels.forEach((panel) => {
     panel.classList.toggle("is-active", panel.dataset.panel === nextTab);
@@ -5334,13 +5437,35 @@ function setTab(tab) {
   window.scrollTo({ top: 0, left: 0 });
 }
 
+function closeSchemeLayout() {
+  layoutLoadSequence += 1;
+  activeSchemeLayout?.dispose();
+  activeSchemeLayout = null;
+  activeSchemeLayoutKey = "";
+}
+
+async function renderSchemeLayout(sample, version) {
+  const key = `${sample.id}:${version.id}`;
+  if (activeSchemeLayoutKey === key) return;
+  closeSchemeLayout();
+  const attempt = layoutLoadSequence;
+  activeSchemeLayoutKey = key;
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js");
+  if (attempt !== layoutLoadSequence) return;
+  activeSchemeLayout = createLayoutWorkspace(schemeLayoutHolder, { source: version.layoutScene, key, draft: schemeLayoutDrafts.get(key),
+    onSceneChange(scene) { schemeLayoutDrafts.set(key, scene); } });
+}
+
 function setSchemePane(pane) {
   const sample = getActiveSample();
-  const targetPane = isFinalOnlyPane(pane) && sample && !hasFinalVersion(sample) ? "adjust" : pane;
+  const version = getActiveVersion(sample);
+  const layoutAvailable = Boolean(version?.layoutScene && canUseDesignerWorkspace);
+  const targetPane = pane === "layout" && !layoutAvailable ? "preview"
+    : isFinalOnlyPane(pane) && sample && !hasFinalVersion(sample) ? "adjust" : pane;
 
   schemeTabButtons.forEach((button) => {
     const isFinalOnly = button.hasAttribute("data-final-only");
-    const isLocked = isFinalOnly && sample && !hasFinalVersion(sample);
+    const isLocked = (isFinalOnly && sample && !hasFinalVersion(sample)) || (button.dataset.schemeTab === "layout" && !layoutAvailable);
     const isActive = button.dataset.schemeTab === targetPane;
     button.hidden = isLocked;
     button.disabled = isLocked;
@@ -5351,6 +5476,15 @@ function setSchemePane(pane) {
   schemePanes.forEach((item) => {
     item.classList.toggle("is-active", item.dataset.schemePane === targetPane);
   });
+  if (sample) {
+    detailStatus.textContent = targetPane === "layout" ? `V${version.number} · 3D 校对` : getSchemeStatus(sample);
+    detailTitle.textContent = targetPane === "layout" ? `${sample.name} · ${sample.style}`
+      : `${sample.name} · ${version ? `${sample.style} ${version.title}` : sample.title}`;
+  }
+  if (targetPane === "layout") renderSchemeLayout(sample, version).catch((error) => {
+    schemeLayoutHolder.textContent = error?.message || "暂时无法打开 3D 校对。";
+  });
+  else if (activeSchemeLayoutKey) closeSchemeLayout();
 }
 
 function isFinalOnlyPane(pane) {
