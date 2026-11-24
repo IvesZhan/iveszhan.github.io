@@ -1,0 +1,21 @@
+{
+  "cream-crescent-sofa.glb": {
+    "source": "https://www.innerscene.com/tools/library/3d-parts/crescent-curved-boucle-sofa-90c9ad84",
+    "author": "Innerscene",
+    "license": "CC0-1.0",
+    "cushionSource": "https://polyhaven.com/a/throw_pillows_01",
+    "cushionAuthor": "Serhii Khromov",
+    "cushionLicense": "CC0-1.0",
+    "textureMaximumEdgePx": 768,
+    "sha256": "c84f8c0f0285c60390b61184b61e7643b1bd776c4e5cb59d8465a75d7a9dadf6",
+    "changes": "Embedded resized PBR textures as JPEG and fitted two recolored sculpted cushions within the sofa's source bounds"
+  },
+  "cream-arc-chair.glb": {
+    "source": "https://www.innerscene.com/tools/library/3d-parts/arc-oak-upholstered-dining-chair-09932cbc",
+    "author": "Innerscene",
+    "license": "CC0-1.0",
+    "textureMaximumEdgePx": 768,
+    "sha256": "8b28ed9a1f18626ed662ecf4c9b7a247c51a3cd358674c74095de5d9dd537dcf",
+    "changes": "Embedded resized PBR textures as JPEG"
+  }
+}

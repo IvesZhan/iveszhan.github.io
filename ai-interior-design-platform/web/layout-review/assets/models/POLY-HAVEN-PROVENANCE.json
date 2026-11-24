@@ -1,0 +1,16 @@
+{
+  "studio-coffee-table.glb": {
+    "source": "https://polyhaven.com/a/modern_coffee_table_01",
+    "license": "CC0-1.0",
+    "textureMaximumEdgePx": 1024,
+    "sha256": "b86ffa3935f8b8b283d0a5b5a31e601e6b5d09c4e330d81427035a989271d046",
+    "changes": "Embedded resized PBR textures and geometry in GLB"
+  },
+  "studio-plant.glb": {
+    "source": "https://polyhaven.com/a/potted_plant_04",
+    "license": "CC0-1.0",
+    "textureMaximumEdgePx": 768,
+    "sha256": "616d84f74e50ef99e5c4a4d0c5206eb0f650acdf3d572918af6544fca8c64f8c",
+    "changes": "Embedded resized PBR textures and geometry in GLB and excluded the separate ground mesh"
+  }
+}

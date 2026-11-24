@@ -29,6 +29,10 @@ function unique(values) {
   return values;
 }
 
+export function isDiningTable(item) {
+  return Boolean(item.shape) || /餐桌|饭桌|圆桌|方桌|矩形桌|dining[-_ ]?table/i.test(item.name);
+}
+
 export function loadLayoutScene(scene) {
   if (scene?.schema !== LAYOUT_SCHEMA) throw new Error("户型数据版本不受支持。");
   const rooms = unique(list(scene.rooms, "房间", 100).map((room) => {
@@ -70,6 +74,7 @@ export function loadLayoutScene(scene) {
     center: point(item.center), widthM: number(item.widthM, 0.02, 30), depthM: number(item.depthM, 0.02, 30),
     heightM: number(item.heightM, 0.01, 12), bottomM: number(item.bottomM ?? 0, -0.5, 12),
     rotationRad: number(item.rotationRad ?? 0, -Math.PI * 8, Math.PI * 8),
+    ...(["round", "rectangular"].includes(item.shape) ? { shape: item.shape } : {}),
   })));
   const entranceId = openings.some((opening) => opening.id === scene.entranceId && opening.kind !== "window") ? scene.entranceId : null;
   const bounds = getLayoutBounds({ rooms, walls });

@@ -1,0 +1,255 @@
+{
+  "license": "See individual material entries",
+  "materials": {
+    "oak-plank": {
+      "source": "https://polyhaven.com/a/laminate_floor_03",
+      "license": "https://polyhaven.com/license",
+      "tileSizeM": [
+        2.08,
+        2.08
+      ],
+      "adjustments": "Balanced the red and yellow cast for natural oiled oak while preserving the plank divisions at their original scale.",
+      "textures": {
+        "color": {
+          "file": "oak-plank-color.jpg",
+          "source": "laminate_floor_03_diff_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 163326,
+          "sha256": "ca1be8ae9ad716967390b5410538810b06b6df86a3b7d640ac4fa8c77141d86b",
+          "colorSpace": "sRGB"
+        },
+        "roughness": {
+          "file": "oak-plank-roughness.jpg",
+          "source": "laminate_floor_03_rough_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 36699,
+          "sha256": "c23e883afd75e8be2ba7182f5936698422b9405eeaaac513aeeb2dd9d6f09acc",
+          "colorSpace": "linear"
+        },
+        "normal": {
+          "file": "oak-plank-normal.jpg",
+          "source": "laminate_floor_03_nor_gl_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 54732,
+          "sha256": "154b32dde5ebdeab16243c16652c8504a0c63cbef0dda67d59db2e97a8a0ff31",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "oak-veneer": {
+      "source": "https://polyhaven.com/a/oak_veneer_01",
+      "license": "https://polyhaven.com/license",
+      "tileSizeM": [
+        1.8,
+        1.8
+      ],
+      "adjustments": "Adjusted the diffuse for muted medium oak and preserved its straight longitudinal grain.",
+      "textures": {
+        "color": {
+          "file": "oak-veneer-color.jpg",
+          "source": "oak_veneer_01_diff_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 154722,
+          "sha256": "b1afc1018a182437b7730acbafb32b413d60e2e22c4773852fe0c32f095f1674",
+          "colorSpace": "sRGB"
+        },
+        "roughness": {
+          "file": "oak-veneer-roughness.jpg",
+          "source": "oak_veneer_01_rough_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 280058,
+          "sha256": "33800609ae815e017072e1e9a78540d7a7b041c321fd31529758d90cdd634e04",
+          "colorSpace": "linear"
+        },
+        "normal": {
+          "file": "oak-veneer-normal.jpg",
+          "source": "oak_veneer_01_nor_gl_2k.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 82183,
+          "sha256": "1b57013bd4a822f8c5ac066f744cc5e54dab86d3982840a3fad8e25564bce649",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "chalk-plaster": {
+      "source": "https://polyhaven.com/a/white_plaster_02",
+      "license": "https://polyhaven.com/license",
+      "tileSizeM": [
+        1.0,
+        1.0
+      ],
+      "adjustments": "Removed broad mottling from the source diffuse while retaining fine pores and supplying a warm greige tint.",
+      "textures": {
+        "color": {
+          "file": "chalk-plaster-color.jpg",
+          "source": "white_plaster_02_diff_2k.jpg",
+          "width": 512,
+          "height": 512,
+          "bytes": 41284,
+          "sha256": "ac7a4089e7b193b35d1629656f6c5d6ad2f1854fcf659cf0a8a9a78079c007f7",
+          "colorSpace": "sRGB"
+        },
+        "roughness": {
+          "file": "chalk-plaster-roughness.jpg",
+          "source": "white_plaster_02_rough_2k.jpg",
+          "width": 512,
+          "height": 512,
+          "bytes": 20497,
+          "sha256": "ce5ac85ee0613acebf2bb7ede741669d3cbcf043ff8c3fa992c34c5e4d7f1df8",
+          "colorSpace": "linear"
+        },
+        "normal": {
+          "file": "chalk-plaster-normal.jpg",
+          "source": "white_plaster_02_nor_gl_2k.jpg",
+          "width": 512,
+          "height": 512,
+          "bytes": 34626,
+          "sha256": "406c29d7f6500bfc61e546edc3e29eef0af9d2f14fcb041e4d472d49f01c5ddf",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "ivory-stone": {
+      "source": "https://ambientcg.com/view?id=Marble018",
+      "license": "https://docs.ambientcg.com/license/",
+      "tileSizeM": [
+        1.35,
+        1.35
+      ],
+      "adjustments": "Muted the diffuse vein contrast for honed warm ivory stone used as one continuous slab.",
+      "textures": {
+        "color": {
+          "file": "ivory-stone-color.jpg",
+          "source": "Marble018_2K-JPG_Color.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 104050,
+          "sha256": "4d2a1dda13ff8709a660d444e581450ba1d1cca1391c045bb3b54c31f1ac0d37",
+          "colorSpace": "sRGB"
+        },
+        "roughness": {
+          "file": "ivory-stone-roughness.jpg",
+          "source": "Marble018_2K-JPG_Roughness.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 153969,
+          "sha256": "064a5d832ebeee6afc83a56d5ce596268cb501fb0c65d86c92523260ac69ac0f",
+          "colorSpace": "linear"
+        },
+        "normal": {
+          "file": "ivory-stone-normal.jpg",
+          "source": "Marble018_2K-JPG_NormalGL.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 12988,
+          "sha256": "9413fd8c458fead73dc485aeef9248158edf977f67d82aea942b607c2f4dbea4",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "wet-tile": {
+      "source": "https://ambientcg.com/view?id=Marble018",
+      "license": "https://docs.ambientcg.com/license/",
+      "tileSizeM": [
+        1.2,
+        1.2
+      ],
+      "adjustments": "Two by two honed marble tiles with fine straight grout in color, roughness and normal channels. Each tile is 0.6 m square.",
+      "textures": {
+        "color": {
+          "file": "wet-tile-color.jpg",
+          "source": "Marble018_2K-JPG_Color.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 114527,
+          "sha256": "264318ca7902213fab171dfcdf765fd406ee457025dce57196bd06a4a745d865",
+          "colorSpace": "sRGB"
+        },
+        "roughness": {
+          "file": "wet-tile-roughness.jpg",
+          "source": "Marble018_2K-JPG_Roughness.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 161852,
+          "sha256": "5ce3743b671bc8ce900cdd06b6b9e97f6db7d541c3f5f0fbc89a239edf8e5db9",
+          "colorSpace": "linear"
+        },
+        "normal": {
+          "file": "wet-tile-normal.jpg",
+          "source": "Marble018_2K-JPG_NormalGL.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 19000,
+          "sha256": "254a41bb95ac933f9168136e76ce903af147c30127b8ef7f5c4be0aba01358fb",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "woven-cream-rug": {
+      "source": "https://ambientcg.com/a/Carpet016",
+      "license": "https://docs.ambientcg.com/license/",
+      "tileSizeM": [
+        1.7,
+        1.7
+      ],
+      "adjustments": "Downsampled the existing Carpet016 color, OpenGL normal and roughness maps for real-time use. Kept the original warm wool color and physical repeat.",
+      "textures": {
+        "color": {
+          "file": "woven-cream-rug-color.jpg",
+          "source": "Carpet016_2K-JPG_Color.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 381362,
+          "sha256": "f3612f372e54d4ae379f0b379d167f38b14125977cc0a1145f7203ea947f8464",
+          "colorSpace": "sRGB"
+        },
+        "normal": {
+          "file": "woven-cream-rug-normal.jpg",
+          "source": "Carpet016_2K-JPG_NormalGL.jpg",
+          "width": 768,
+          "height": 768,
+          "bytes": 329225,
+          "sha256": "d5b7a841be4eab3fc952eec16155ad4eb9cf02ffc4bddd38d2840e20f1e817f9",
+          "colorSpace": "linear"
+        },
+        "roughness": {
+          "file": "woven-cream-rug-roughness.jpg",
+          "source": "Carpet016_2K-JPG_Roughness.jpg",
+          "width": 512,
+          "height": 512,
+          "bytes": 111096,
+          "sha256": "9c8e5c9c727025cccad52a43f0d8d91c9a7214c45f88a1b21b5daa9e2b4a5cd1",
+          "colorSpace": "linear"
+        }
+      }
+    },
+    "v6-honed-travertine": {
+      "source": "OpenAI image generation from the Jindi V6 living-dining preview",
+      "license": null,
+      "styleReference": "../../../assets/projects/jindi-dacheng-cream/v6-living-ai-preview.jpg",
+      "tileSizeM": [
+        0.7,
+        0.7
+      ],
+      "adjustments": "Orthographic material-only color. Three.js computes low relief from the same texture as a height input.",
+      "textures": {
+        "color": {
+          "file": "v6-honed-travertine-color.jpg",
+          "width": 1024,
+          "height": 1024,
+          "bytes": 401742,
+          "sha256": "28115b25b0228457d47318049abf1853f70db31bdef5eac249a3756ce4d308c0",
+          "colorSpace": "sRGB"
+        }
+      }
+    }
+  },
+  "licenseText": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "process": "Cached source maps resized and encoded as JPEG. Normal maps use OpenGL Y+ orientation and 4:4:4 JPEG sampling. Roughness is linear grayscale."
+}

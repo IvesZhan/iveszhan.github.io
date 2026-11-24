@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
     <title>交换空间设计平台</title>
     <meta
       name="description"
       content="交换空间设计平台，用于管理、生成和交付家装空间方案。"
     />
-    <link rel="stylesheet" href="./styles.css?v=vr-map-switch-fix-4" />
-      <link rel="stylesheet" href="./layout-review/workspace.css?v=20261123" />
+    <link rel="stylesheet" href="./styles.css?v=cream-v6-3" />
+    <link rel="stylesheet" href="./layout-review/workspace.css?v=cream-v6-3" />
   </head>
   <body data-role="client">
     <header class="app-header">
@@ -99,6 +100,35 @@
         </div>
       </section>
 
+      <section class="view-panel realtime-share" data-panel="realtime-share" aria-labelledby="realtimeShareTitle">
+        <div data-realtime-share-stage></div>
+        <div class="realtime-share-top">
+          <header class="realtime-share-heading">
+            <h1 id="realtimeShareTitle" data-realtime-share-title>正在打开方案</h1>
+            <p data-realtime-share-version>实时 3D 漫游</p>
+          </header>
+          <div class="realtime-share-actions">
+            <details class="realtime-feedback-panel">
+              <summary>留言</summary>
+              <form class="realtime-feedback" data-realtime-share-feedback hidden>
+                <div class="realtime-feedback-context">
+                  <label for="realtimeFeedback">给设计师留言</label>
+                  <p aria-live="polite" data-realtime-feedback-anchor>可以先在漫游里选择一件家具。</p>
+                </div>
+                <div class="realtime-feedback-compose">
+                  <textarea id="realtimeFeedback" name="message" rows="3" maxlength="1000" placeholder="想修改的位置或需求" required></textarea>
+                  <div class="realtime-feedback-actions">
+                    <button class="layout-action layout-action-primary" type="submit">发送反馈</button>
+                    <span role="status" data-realtime-feedback-status></span>
+                  </div>
+                </div>
+              </form>
+            </details>
+            <a class="realtime-share-exit" href="#samples" aria-label="退出漫游" title="退出漫游"><span aria-hidden="true">×</span></a>
+          </div>
+        </div>
+      </section>
+
       <section class="view-panel" id="schemeDetail" data-panel="scheme-detail" aria-label="方案详情">
         <div class="scheme-detail-header">
           <div class="scheme-title-block">
@@ -127,6 +157,7 @@
                   <div>
                     <button type="button" data-inline-vr-auto>旋转</button>
                     <button type="button" data-inline-vr-reset>复位</button>
+                    <button type="button" data-inline-vr-music aria-label="背景音乐" aria-pressed="false" hidden>音乐</button>
                     <button type="button" data-inline-vr-fullscreen>全屏</button>
                   </div>
                 </div>
@@ -141,6 +172,14 @@
                 <h2 id="detailRoomName">客餐厅</h2>
                 <p id="detailSummary">已完成关键空间效果预览。</p>
               </div>
+              <section class="scheme-walkthrough" data-scheme-walkthrough aria-label="实时 3D 查看" hidden>
+                <strong>实时 3D</strong>
+                <div>
+                  <a data-walkthrough-view="walk">进入漫游</a>
+                  <a data-walkthrough-view="panorama">360° 环看</a>
+                  <a data-walkthrough-view="layout">3D 校对</a>
+                </div>
+              </section>
               <dl class="scheme-meta">
                 <div>
                   <dt>面积</dt>
@@ -162,6 +201,7 @@
 
         <div class="scheme-pane" data-scheme-pane="layout">
           <div data-scheme-layout-review></div>
+          <div class="realtime-version-extras" data-realtime-version-extras hidden></div>
         </div>
 
         <div class="scheme-pane" data-scheme-pane="adjust">
@@ -299,13 +339,13 @@
             </div>
             <label class="idea-field">
               <span>设计想法</span>
-              <textarea data-design-idea rows="4" placeholder="例如：客餐厅收纳多一点，整体不要太暗，厨房尽量开放。"></textarea>
+              <textarea data-design-idea rows="4" placeholder="例如：客厅沙发 2.4 米 × 90 厘米，餐厅用直径 1.15 米的四人圆桌。"></textarea>
             </label>
             <div class="generation-status" data-generation-status aria-live="polite"></div>
             <div class="generation-footer">
               <div>
                 <strong>生成方案</strong>
-                <small>检查通过后生成空间全景和 VR 交付入口。</small>
+                <small data-generation-output>检查通过后生成空间全景和 VR 交付入口。</small>
               </div>
               <button class="primary-action generate-action" type="button" data-generate-plan disabled>
                 生成空间方案
@@ -368,6 +408,6 @@
       </section>
     </div>
 
-    <script src="./app.js?v=jindi-layout-review-v5-20261123" type="module"></script>
+    <script src="./app.js?v=cream-v6-3" type="module"></script>
   </body>
 </html>

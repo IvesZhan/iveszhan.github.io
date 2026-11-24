@@ -9,7 +9,7 @@
     "style": "奶油风",
     "delivery": "整屋3D效果图",
     "phase": "review",
-    "summary": "从同一份校正后的四房模型渲染。3D 校对可查看家具尺寸、洞口净宽与开门角度。",
+    "summary": "包含整屋效果图及基于四房模型的实时 3D 查看。",
     "previewOnly": true,
     "floorPlanImage": "./assets/projects/jindi-dacheng-cream/floor-plan.png",
     "rooms": [
@@ -765,7 +765,7 @@
         "previewLabel": "整屋3D效果图",
         "deliverable": false,
         "createdAt": "2026-11-23 15:04",
-        "summary": "从同一份校正后的四房模型渲染。3D 校对可查看家具尺寸、洞口净宽与开门角度。",
+        "summary": "整屋视角沿用已校正的四房户型。可进入模型漫游、在当前房间 360° 环看，或核对家具尺寸与门洞。",
         "adjustments": [],
         "scenes": [
           {
@@ -822,6 +822,7 @@
           {
             "id": "corridor",
             "name": "卧室过道",
+            "roomId": "hall",
             "roomName": "卧室过道",
             "image": "./assets/projects/jindi-dacheng-cream/v5-corridor.jpg",
             "preview": "./assets/projects/jindi-dacheng-cream/v5-corridor.jpg",
@@ -958,11 +959,54 @@
         ],
         "assets": [],
         "vrPackage": null,
+        "realtimeWalkthrough": true,
         "layoutScene": "./assets/projects/jindi-dacheng-cream/layout-v5.json",
         "qualityReport": {
           "projection": "perspective",
           "views": 11,
           "layoutSceneSha256": "76aef405015ec9fe6c1f16cbc4173f88d28bbe74ac2193736dd37827157f06e2"
+        }
+      },
+      {
+        "id": "jindi-dacheng-119-cream-v6-ai-preview",
+        "number": 6,
+        "baseVersionId": "jindi-dacheng-119-cream-v5",
+        "title": "V6 · 客餐厅 AI 精修",
+        "status": "V6 · 客餐厅 AI 精修",
+        "qualityStatus": "draft",
+        "previewLabel": "客餐厅效果图",
+        "deliverable": false,
+        "createdAt": "2026-11-24",
+        "summary": "客餐厅效果图以 11 月 6 日奶油风为参考。V6 实时漫游沿用同一户型和客餐厅家具布置，可从效果图机位进入。",
+        "adjustments": [],
+        "scenes": [
+          {
+            "id": "living",
+            "name": "客餐厅",
+            "roomName": "客餐厅",
+            "image": "./assets/projects/jindi-dacheng-cream/v6-living-ai-preview.jpg",
+            "preview": "./assets/projects/jindi-dacheng-cream/v6-living-ai-preview.jpg",
+            "alt": "金地大成乐府奶油风客餐厅 AI 精修效果图",
+            "description": "奶白卷曲绒面、亚麻披毯、暖调洞石与浅木，前景日光、挂画洗墙和厨房柜底灯形成层次。",
+            "fit": "contain",
+            "shot_type": "interior",
+            "projection": "perspective",
+            "source_provider": "imagegen_reference_edit",
+            "quality_status": "draft",
+            "deliverable": false,
+            "width": 1819,
+            "height": 865
+          }
+        ],
+        "vrPackage": null,
+        "realtimeWalkthrough": true,
+        "layoutScene": "./assets/projects/jindi-dacheng-cream/layout-v5.json",
+        "visualProfile": "cream-v6",
+        "qualityReport": {
+          "projection": "perspective",
+          "views": 1,
+          "geometrySourceVersionId": "jindi-dacheng-119-cream-v5",
+          "styleReferenceVersionId": "jindi-dacheng-119-cream-v2"
         }
       }
     ],

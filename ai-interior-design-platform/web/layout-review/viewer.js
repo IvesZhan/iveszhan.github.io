@@ -1,5 +1,11 @@
 import * as THREE from "./vendor/three.module.min.js";
-import { getLayoutBounds } from "./scene.js";
+import { containsPoint, getLayoutBounds, isDiningTable } from "./scene.js";
+import { createWalkNavigation } from "./walk-navigation.js";
+import { createWalkAppearance } from "./walk-appearance.js?v=cream-v6-3";
+import { loadWalkFurniture } from "./walk-furniture.js?v=cream-v6-3";
+import { applyBoxFinish, createWalkFitout, makeCreamCoffeeTable, makeWalkMillwork, makeWalkRoundTable, surfaceMaterial } from "./walk-fitout.js?v=cream-v6-3";
+import { createWalkLighting, exteriorWindows } from "./walk-lighting.js?v=cream-v6-3";
+import { makeWalkFixture } from "./walk-fixtures.js";
 
 const colors = {
   background: 0xecece4, floors: [0xe9e2d1, 0xe9e2d1, 0xe9e6da, 0xe9e0d1],
@@ -13,29 +19,52 @@ function line(scene, a, b, color, height = 0.025) {
   scene.add(new THREE.Line(path, new THREE.LineBasicMaterial({ color })));
 }
 
-function box(container, x, y, z, width, height, depth, color, angle = 0) {
+function box(container, x, y, z, width, height, depth, color, angle = 0, outlined = true) {
   const material = new THREE.MeshStandardMaterial({ color, roughness: 0.84 });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
   mesh.position.set(x, y, z);
   mesh.rotation.y = -angle;
   container.add(mesh);
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: colors.wallTop, transparent: true, opacity: 0.48 }));
-  mesh.add(edges);
+  if (outlined) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),
+    new THREE.LineBasicMaterial({ color: colors.wallTop, transparent: true, opacity: 0.48 })));
   return mesh;
 }
 
-function furniture(group, item) {
+function furniture(group, item, outlined, appearance, room) {
   const [x, z] = item.center;
   const { widthM: width, depthM: depth, heightM: height, bottomM: bottom, rotationRad: angle } = item;
   const node = new THREE.Group();
   node.position.set(x, bottom, z);
   node.rotation.y = -angle;
   group.add(node);
+  if (appearance) {
+    if (appearance.cream) {
+      const coffee = makeCreamCoffeeTable(node, item, appearance);
+      if (coffee.length) return coffee;
+    }
+    const fixture = makeWalkFixture(node, item);
+    if (fixture.length) return fixture;
+    const millwork = makeWalkMillwork(node, item, room, appearance);
+    if (millwork.length) return millwork;
+    const roundTable = makeWalkRoundTable(node, item, appearance);
+    if (roundTable.length) return roundTable;
+  }
   const parts = [];
-  function part(px, py, pz, w, h, d, color) {
+  function part(px, py, pz, w, h, d, color, finish) {
     if (w <= 0.008 || h <= 0.008 || d <= 0.008) return;
-    const mesh = box(node, px, py, pz, w, h, d, color);
+    const mesh = box(node, px, py, pz, w, h, d, color, 0, outlined);
+    if (finish) applyBoxFinish(mesh, finish, w, h, d);
+    mesh.userData = { id: item.id, color: mesh.material.color.getHex() };
+    parts.push(mesh);
+  }
+  function cylinder(y, radius, length, color) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 32), new THREE.MeshStandardMaterial({ color, roughness: 0.67 }));
+    mesh.position.y = y;
+    mesh.scale.z = depth / width;
     mesh.userData = { id: item.id, color };
+    if (outlined) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.LineBasicMaterial({ color: colors.wallTop, transparent: true, opacity: 0.48 })));
+    node.add(mesh);
     parts.push(mesh);
   }
   if (/床/.test(item.name) && !/床头|床边|床尾/.test(item.name) && width > 0.8 && depth > 0.8) {
@@ -56,12 +85,19 @@ function furniture(group, item) {
     bedPart(0, main, long * 0.152, narrow * 0.92, 0.044, long * 0.58, 0xd7cfbc);
     const pillows = narrow > 1.4 ? [-0.24, 0.24] : [0];
     for (const pillow of pillows) bedPart(pillow * narrow, main + 0.013, -long * 0.29, narrow * (pillows.length === 2 ? 0.42 : 0.58), 0.069, long * 0.205, 0xf5f0e7);
-  } else if (/餐桌|茶几|床头几|书桌/.test(item.name) && height > 0.16) {
+  } else if ((isDiningTable(item) || /茶几|床头几|书桌/.test(item.name)) && height > 0.16) {
     const plate = Math.min(0.055, height * 0.18);
-    part(0, height - plate / 2, 0, width, plate, depth, 0xbb9b75);
-    const leg = Math.min(0.05, width * 0.14, depth * 0.14);
-    for (const signX of [-1, 1]) for (const signZ of [-1, 1]) {
-      part(signX * (width / 2 - leg), (height - plate) / 2, signZ * (depth / 2 - leg), leg, height - plate, leg, 0xa38769);
+    if ((item.shape === "round" || (!outlined && item.shape !== "rectangular" && (isDiningTable(item) || /床头几/.test(item.name)))) &&
+        Math.max(width, depth) / Math.min(width, depth) < 1.25) {
+      cylinder(height - plate / 2, width / 2, plate, 0xc9a77d);
+      cylinder((height - plate) / 2, width * 0.125, height - plate, 0xad8862);
+      cylinder(0.045, width * 0.23, 0.09, 0xad8862);
+    } else {
+      part(0, height - plate / 2, 0, width, plate, depth, 0xbb9b75, appearance?.wood);
+      const leg = Math.min(0.05, width * 0.14, depth * 0.14);
+      for (const signX of [-1, 1]) for (const signZ of [-1, 1]) {
+        part(signX * (width / 2 - leg), (height - plate) / 2, signZ * (depth / 2 - leg), leg, height - plate, leg, 0xa38769);
+      }
     }
   } else if (/沙发/.test(item.name) && width > 0.4 && depth > 0.4) {
     const w = Math.min(width, depth);
@@ -75,27 +111,63 @@ function furniture(group, item) {
       part(-width / 2 + arm / 2, height * 0.73, 0, arm, height * 0.54, depth, 0xd4c8b2);
       for (const side of [-1, 1]) part(arm / 2, height * 0.57, side * (depth - arm) / 2, width - arm, height * 0.34, arm, 0xd7ccba);
     }
-  } else if (/柜/.test(item.name) && height > 0.34 && Math.max(width, depth) > 0.8) {
+  } else if (/柜/.test(item.name) && height > (appearance ? 0.21 : 0.34) && Math.max(width, depth) > 0.8) {
     const longAlongX = width > depth;
     const panelCount = Math.max(2, Math.min(5, Math.round(Math.max(width, depth) / 0.48)));
     const pitch = Math.max(width, depth) / panelCount;
+    const counter = appearance && /橱|餐边/.test(item.name) && height < 1.2 ? 0.032 : 0;
+    const toe = appearance && height > 0.56 && bottom < 0.08 ? 0.065 : 0;
+    const faceHeight = height - toe - counter;
     for (let index = 0; index < panelCount; index += 1) {
       const pos = (index + 0.5 - panelCount / 2) * pitch;
       const color = index % 2 ? 0xc2ad92 : 0xcab89d;
-      part(longAlongX ? pos : 0, height / 2, longAlongX ? 0 : pos, longAlongX ? pitch - 0.009 : width,
-        height, longAlongX ? depth : pitch - 0.009, color);
+      part(longAlongX ? pos : 0, toe + faceHeight / 2, longAlongX ? 0 : pos, longAlongX ? pitch - 0.007 : width,
+        faceHeight, longAlongX ? depth : pitch - 0.007, color, appearance?.wood);
     }
+    if (counter) part(0, height - counter / 2, 0, width, counter, depth, 0xd9ccb6, appearance.stone);
+    if (toe) part(0, toe / 2, 0, width - 0.045, toe, depth - 0.045, 0x5f5040);
+  } else if (appearance && /柜/.test(item.name)) {
+    part(0, height / 2, 0, width, height, depth, 0xad9173, appearance.wood);
   } else {
     part(0, height / 2, 0, width, height, depth, /椅|凳/.test(item.name) ? colors.softFurniture : colors.furniture);
   }
   return parts;
 }
 
-function floor(room, color) {
-  const shape = new THREE.Shape(room.polygon.map(([x, z]) => new THREE.Vector2(x, z)));
-  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.96, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), material);
-  mesh.rotation.x = Math.PI / 2;
+function floor(room, color, { height = 0, ...finish } = {}) {
+  const shape = new THREE.Shape(room.polygon.map(([x, z]) => new THREE.Vector2(x, height ? z : -z)));
+  const geometry = new THREE.ShapeGeometry(shape);
+  if (finish.map) {
+    const [uPeriod, vPeriod] = finish.repeatM;
+    const uv = geometry.getAttribute("uv");
+    for (let i = 0; i < uv.count; i += 1) uv.setXY(i, uv.getX(i) / uPeriod, uv.getY(i) / vPeriod);
+  }
+  const properties = { side: THREE.DoubleSide };
+  if (height) Object.assign(properties, { emissive: 0xc9baa6, emissiveIntensity: 0.13 });
+  const material = surfaceMaterial({ color, roughness: 0.96, ...finish }, properties);
+  if (finish.tileSizeM && finish.map) {
+    // All room slabs share the same metric grout grid across doorways and open boundaries.
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.tileRepeat = { value: new THREE.Vector2(...finish.repeatM).divideScalar(finish.tileSizeM) };
+      shader.fragmentShader = "uniform vec2 tileRepeat;\n" + shader.fragmentShader.replace("#include <map_fragment>", `
+        #include <map_fragment>
+        vec2 tileGrid = vMapUv * tileRepeat + vec2(0.17, 0.43);
+        vec2 tileFraction = fract(tileGrid);
+        vec2 nearestJoint = min(tileFraction, 1.0 - tileFraction);
+        float seamDistance = min(nearestJoint.x, nearestJoint.y);
+        float filterWidth = max(0.0003, max(fwidth(tileGrid.x), fwidth(tileGrid.y)) * 0.65);
+        float joint = 1.0 - smoothstep(0.0015 - filterWidth, 0.0015 + filterWidth, seamDistance);
+        float tileTone = fract(sin(dot(floor(tileGrid), vec2(12.9898, 78.233))) * 43758.5453);
+        diffuseColor.rgb *= mix(0.986 + tileTone * 0.028, 0.77, joint);
+      `);
+    };
+    material.customProgramCacheKey = () => "cream-porcelain-grid";
+  }
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.rotation.x = (height ? 1 : -1) * Math.PI / 2;
+  mesh.position.y = height;
+  mesh.castShadow = Boolean(height);
+  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -118,7 +190,7 @@ function roomLabel(room) {
   return sprite;
 }
 
-function addWall(group, wall, openings, heightLimit) {
+function addWall(group, wall, openings, heightLimit, appearance = null, rooms = []) {
   const [ax, az] = wall.start;
   const dx = wall.end[0] - ax;
   const dz = wall.end[1] - az;
@@ -129,50 +201,135 @@ function addWall(group, wall, openings, heightLimit) {
   const cuts = openings.filter((opening) => !opening.excludedReason).map((opening) => ({
     opening, span: opening.segment.map(project).sort((a, b) => a - b),
   })).filter(({ span }) => span[1] - span[0] > 0.015).sort((a, b) => a.span[0] - b.span[0]);
-  function section(a, b, bottom, top, color = colors.wall, thickness = wall.thicknessM) {
+  const finish = appearance?.wallFinish();
+  const sideFinishes = appearance ? [1, -1].map((sign) => {
+    const offset = sign * (wall.thicknessM / 2 + 0.16) / length;
+    const sample = [ax + dx / 2 - dz * offset, az + dz / 2 + dx * offset];
+    return appearance.wallFinish(rooms.find((room) => containsPoint(sample, room.polygon)));
+  }) : [];
+  function section(a, b, bottom, top, color, thickness = wall.thicknessM) {
     if (b - a < 0.012 || top - bottom < 0.01) return;
     const center = (a + b) / (2 * length);
-    box(group, ax + center * dx, (bottom + top) / 2, az + center * dz, b - a, top - bottom, thickness, color, angle);
+    const mesh = box(group, ax + center * dx, (bottom + top) / 2, az + center * dz,
+      b - a, top - bottom, thickness, color ?? appearance?.wall ?? colors.wall, angle, !appearance);
+    if (appearance) {
+      if (color === undefined) applyBoxFinish(mesh, finish, b - a, top - bottom, thickness, a, bottom, sideFinishes);
+      mesh.castShadow = mesh.receiveShadow = true;
+    }
+    return mesh;
+  }
+  function solid(a, b, bottom, top) {
+    section(a, b, bottom, top);
+    if (appearance && bottom === 0 && top >= 0.062) section(a, b, 0.008, 0.062, appearance.trim, wall.thicknessM + 0.014);
   }
   let cursor = 0;
   for (const { opening, span: [start, end] } of cuts) {
     if (end <= cursor) continue;
-    section(cursor, start, 0, height);
+    solid(cursor, start, 0, height);
     const bottom = Math.min(height, opening.sillM);
     const top = Math.min(height, opening.sillM + opening.heightM);
-    section(Math.max(cursor, start), end, 0, bottom);
+    solid(Math.max(cursor, start), end, 0, bottom);
     section(Math.max(cursor, start), end, top, height);
-    if (opening.kind === "window") section(Math.max(cursor, start), end, bottom, top, colors.window, 0.03);
+    if (opening.kind === "window") {
+      const glass = section(Math.max(cursor, start), end, bottom, top, colors.window, 0.03);
+      if (appearance && glass) {
+        glass.material.color.setHex(0xc8d4cf);
+        glass.material.roughness = 0.19;
+        glass.material.transparent = true;
+        glass.material.depthWrite = false;
+        glass.material.opacity = 0.12;
+        glass.castShadow = false;
+        const metal = 0x5e5850;
+        section(start, end, bottom, bottom + 0.04, metal, 0.072);
+        section(start, end, top - 0.04, top, metal, 0.072);
+        const panes = Math.max(1, Math.ceil((end - start) / 1.5));
+        for (let index = 0; index <= panes; index += 1) {
+          const x = start + 0.017 + index * (end - start - 0.034) / panes;
+          section(x - 0.017, x + 0.017, bottom, top, metal, 0.072);
+        }
+      }
+    }
     cursor = end;
   }
-  section(cursor, length, 0, height);
+  solid(cursor, length, 0, height);
 }
 
 function disposeGroup(group) {
   group.traverse((object) => {
-    object.geometry?.dispose();
-    object.material?.map?.dispose();
-    object.material?.dispose();
+    if (!object.userData.walkAsset) object.geometry?.dispose();
+    if (object.isSprite) object.material.map?.dispose();
+    if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
+    else object.material?.dispose();
   });
   group.clear();
 }
 
-export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
+const walkKeys = new Map([
+  ["KeyW", "forward"], ["ArrowUp", "forward"], ["KeyS", "backward"], ["ArrowDown", "backward"],
+  ["KeyA", "left"], ["ArrowLeft", "left"], ["KeyD", "right"], ["ArrowRight", "right"],
+]);
+const eyeHeight = 1.56;
+const isInteriorView = (mode) => mode === "walk" || mode === "panorama";
+
+function findBedroomFrame(bed, room, entry, windowView, navigation) {
+  const length = Math.max(bed.widthM, bed.depthM);
+  const width = Math.min(bed.widthM, bed.depthM);
+  const angle = bed.rotationRad + (bed.widthM >= bed.depthM ? 0 : Math.PI / 2);
+  const [ax, az] = [Math.cos(angle), Math.sin(angle)];
+  const [x, z] = bed.center;
+  const approach = entry ? entry.segment[0].map((value, index) => (value + entry.segment[1][index]) / 2) : [x - az, z + ax];
+  const side = Math.sign((approach[0] - x) * -az + (approach[1] - z) * ax) || 1;
+  const positions = [side, -side].flatMap((sign) => [0.52, 0.34].flatMap((footGap) =>
+    [0.79, 0.49].map((sideGap) => {
+      const forward = length / 2 + footGap;
+      const across = (width / 2 + sideGap) * sign;
+      return [x + ax * forward - az * across, z + az * forward + ax * across];
+    })));
+  const position = positions.find((point) => navigation.roomAt(point)?.id === room.id && navigation.canOccupy(point));
+  if (!position) return null;
+  const aim = windowView ? bed.center.map((coordinate, index) => coordinate * 0.80 + windowView.center[index] * 0.20) : bed.center;
+  return { position, aim };
+}
+
+export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onWalkNotice, styleId, visualProfile } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setClearColor(colors.background);
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute("aria-label", "户型模型，拖动旋转，滚轮缩放");
   element.append(renderer.domElement);
   const world = new THREE.Scene();
   const layout = new THREE.Group();
   const annotations = new THREE.Group();
-  world.add(layout, annotations, new THREE.HemisphereLight(0xfffcf2, 0xa4b7ac, 2.25));
+  const hemisphere = new THREE.HemisphereLight(0xfffcf2, 0xa4b7ac, 2.25);
+  world.add(layout, annotations, hemisphere);
   const light = new THREE.DirectionalLight(0xfff3e8, 1.9);
   light.position.set(-5, 9, 10);
   world.add(light);
+  const lighting = createWalkLighting(renderer, world, render, styleId === "cream", { visualProfile });
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 400);
+  const walkCamera = new THREE.PerspectiveCamera(62, 1, 0.027, 100);
+  walkCamera.rotation.order = "YXZ";
+  let appearance;
+  let fitout;
+  let windows = [];
+  let walkPost;
+  let postLoading = false;
+  let walkFurniture;
+  let furnitureReady;
+  let capturingPanorama = false;
+  let disposed = false;
+  let contextLost = false;
+  let navigation;
+  let walkPosition = null;
+  let walkRoomId;
+  let walkEyeHeight = eyeHeight;
+  let yaw = 0;
+  let pitch = 0;
+  let walkFieldOfView = 47;
+  let lastFrame = null;
+  const heldKeys = new Set();
+  const touchDirections = new Set();
   const raycaster = new THREE.Raycaster();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.011);
   const target = new THREE.Vector3();
@@ -188,14 +345,173 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
   let measuring = false;
   let model;
   let itemMeshes = [];
+  let doorMeshes = [];
   let frame = 0;
+  let viewportWidth = 0;
+  let viewportHeight = 0;
+
+  function clearWalkInput() {
+    heldKeys.clear();
+    touchDirections.clear();
+    lastFrame = null;
+  }
+
+  function reportWalkPosition() {
+    const room = walkPosition ? navigation?.roomAt(walkPosition) : null;
+    const id = room?.id || null;
+    if (id !== walkRoomId) {
+      walkRoomId = id;
+      lighting.setRoom(room, windows.some((window) => window.room.id === id));
+      onWalkRoom?.(id);
+    }
+  }
+
+  function placeWalker(roomId = null) {
+    const nextPosition = navigation?.spawn(roomId);
+    clearWalkInput();
+    if (!nextPosition) {
+      if (!walkPosition || !navigation?.canOccupy(walkPosition)) walkPosition = null;
+      onWalkNotice?.("当前空间内没有足够的站立位置。可在平面视图调整布局。");
+      reportWalkPosition();
+      return;
+    }
+    walkPosition = nextPosition;
+    const room = navigation.roomAt(walkPosition);
+    const doors = model.openings.filter((opening) => opening.kind !== "window" && !opening.excludedReason && opening.roomIds.includes(room?.id));
+    const ahead = doors.find((door) => door.id !== model.entranceId) || doors[0];
+    const roomItems = roomId ? model.items.filter((item) => item.roomId === room?.id) : [];
+    const sofa = roomItems.find((item) => /沙发|sofa/i.test(item.name));
+    const dining = roomItems.find(isDiningTable);
+    const tv = roomItems.find((item) => /电视柜|tv.?console/i.test(item.name));
+    const bed = roomItems.find((item) => /床(?!头|边|尾)|\bbed\b/i.test(item.name));
+    const furnishTarget = sofa || dining || bed || roomItems.find((item) => /台盆柜|浴室柜/i.test(item.name)) ||
+      roomItems.find((item) => /橱柜|玄关柜|淋浴隔断/i.test(item.name));
+    let aim = furnishTarget?.center || ahead?.segment.reduce(([x, z], [px, pz]) => [x + px / 2, z + pz / 2], [0, 0]);
+    let frameType;
+    if (furnishTarget) {
+      const broadWindow = windows.filter((window) => window.room.id === room.id).sort((a, b) => b.span - a.span)[0];
+      if (broadWindow) aim = aim.map((coordinate, index) => coordinate * 0.71 + broadWindow.center[index] * 0.29);
+      else if (sofa && dining) aim = aim.map((coordinate, index) => coordinate * 0.63 + dining.center[index] * 0.37);
+      const { minX, maxX, minZ, maxZ } = getLayoutBounds({ rooms: [room], walls: [] });
+      const anchors = [0.12, 0.34, 0.66, 0.88].flatMap((u) => [0.12, 0.34, 0.66, 0.88].map((v) => [
+        THREE.MathUtils.lerp(minX, maxX, u), THREE.MathUtils.lerp(minZ, maxZ, v),
+      ]));
+      function frameScore([x, z]) {
+        const distance = Math.hypot(x - aim[0], z - aim[1]);
+        const diagonal = Math.abs(x - aim[0]) * Math.abs(z - aim[1]) / Math.max(0.25, distance);
+        const windowDepth = broadWindow
+          ? (x - broadWindow.center[0]) * broadWindow.inward[0] + (z - broadWindow.center[1]) * broadWindow.inward[1] : 0;
+        return Math.min(distance, 3.9) + 0.23 * diagonal + 0.37 * windowDepth;
+      }
+      const frame = anchors.filter((point) => navigation.roomAt(point)?.id === room.id && navigation.canOccupy(point))
+        .sort((a, b) => frameScore(b) - frameScore(a))[0];
+      if (frame) walkPosition = frame;
+      if (styleId === "cream" && furnishTarget === bed) {
+        const bedroomFrame = findBedroomFrame(bed, room, ahead, broadWindow, navigation);
+        if (bedroomFrame) {
+          walkPosition = bedroomFrame.position;
+          aim = bedroomFrame.aim;
+          frameType = "bedroom";
+        }
+      }
+      if (styleId === "cream" && sofa && tv && broadWindow) {
+        const diningIds = new Set(model.items.filter(isDiningTable).map((item) => item.roomId));
+        const adjoiningDining = doors.find((opening) => opening.kind === "passage" && opening.roomIds
+          .some((id) => id !== room.id && diningIds.has(id)));
+        if (adjoiningDining) {
+          const entry = adjoiningDining.segment.map(([x, z]) => new THREE.Vector2(x, z));
+          const center = entry[0].lerp(entry[1], 0.5);
+          const { center: [x, z], inward: [nx, nz], span } = broadWindow;
+          if (center.distanceTo(new THREE.Vector2(x, z)) > 2.7) {
+            const tvSide = Math.sign((tv.center[0] - x) * -nz + (tv.center[1] - z) * nx) || 1;
+            const candidate = [0.65, 0.86, 1.06].flatMap((inset) => [0.35, 0.27, 0.16].map((offset) => [
+              x + nx * inset - nz * span * offset * tvSide, z + nz * inset + nx * span * offset * tvSide,
+            ])).find((position) => navigation.roomAt(position)?.id === room.id && navigation.canOccupy(position));
+            if (candidate) {
+              walkPosition = candidate;
+              aim = [center.x * 0.63 + sofa.center[0] * 0.37, center.y * 0.63 + sofa.center[1] * 0.37];
+              frameType = "living-dining";
+            }
+          }
+        }
+      }
+      if (!frameType && sofa && tv && broadWindow?.span > 2.35) {
+        const { center: [x, z], inward: [nx, nz], span } = broadWindow;
+        const distance = THREE.MathUtils.clamp(span * 0.95, 2.55, 4.3);
+        const sofaSide = Math.sign((sofa.center[0] - x) * -nz + (sofa.center[1] - z) * nx);
+        const offsets = [-span * 0.29 * sofaSide, -span * 0.19 * sofaSide, -span * 0.09 * sofaSide];
+        const candidate = [distance, distance - 0.35, distance - 0.7].flatMap((depth) => offsets.map((offset) => [
+          x + nx * depth - nz * offset, z + nz * depth + nx * offset,
+        ])).find((position) => navigation.roomAt(position)?.id === room.id && navigation.canOccupy(position));
+        if (candidate) {
+          walkPosition = candidate;
+          aim = [sofa.center[0] * 0.76 + x * 0.24, sofa.center[1] * 0.76 + z * 0.24];
+          frameType = "living";
+        }
+      }
+    }
+    yaw = aim ? Math.atan2(walkPosition[0] - aim[0], walkPosition[1] - aim[1]) : Math.PI;
+    walkEyeHeight = frameType === "living-dining" ? 1.35 : eyeHeight;
+    pitch = frameType === "living-dining" ? -0.095 : frameType === "bedroom" ? -0.19 : furnishTarget ? -0.16 : -0.05;
+    walkFieldOfView = frameType === "living-dining" ? 54 : frameType === "living" ? 55 : frameType === "bedroom" ? 52 : 47;
+    onWalkNotice?.("");
+    reportWalkPosition();
+  }
+
+  function stepWalk(timestamp) {
+    const directions = new Set([...heldKeys].map((key) => walkKeys.get(key)).concat([...touchDirections]));
+    if (!directions.size) { lastFrame = null; return false; }
+    const elapsed = lastFrame === null ? 0 : Math.min(0.09, Math.max(0, (timestamp - lastFrame) / 1000));
+    lastFrame = timestamp;
+    const right = Number(directions.has("right")) - Number(directions.has("left"));
+    const forward = Number(directions.has("forward")) - Number(directions.has("backward"));
+    const distance = 1.55 * elapsed / (Math.hypot(right, forward) || 1);
+    if (walkPosition && distance > 0 && (right || forward)) {
+      const toward = [(right * Math.cos(yaw) - forward * Math.sin(yaw)) * distance,
+        (-right * Math.sin(yaw) - forward * Math.cos(yaw)) * distance];
+      walkPosition = navigation.move(walkPosition, toward);
+      reportWalkPosition();
+    }
+    return true;
+  }
+
+  function lookAround(horizontal, vertical) {
+    const limit = mode === "panorama" ? Math.PI / 2 - 0.01 : 1.16;
+    yaw += horizontal;
+    pitch = THREE.MathUtils.clamp(pitch + vertical, -limit, limit);
+  }
 
   function render() {
-    if (frame) return;
-    frame = requestAnimationFrame(() => {
+    if (frame || contextLost || disposed) return;
+    frame = requestAnimationFrame((timestamp) => {
       frame = 0;
-      if (element.clientWidth < 2 || element.clientHeight < 2) return;
-      const aspect = element.clientWidth / element.clientHeight;
+      const width = element.clientWidth;
+      const height = element.clientHeight;
+      if (width < 2 || height < 2) return;
+      const aspect = width / height;
+      if (viewportWidth !== width || viewportHeight !== height) {
+        viewportWidth = width;
+        viewportHeight = height;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(2_100_000 / (width * height))));
+        renderer.setSize(width, height, false);
+        walkPost?.resize(width, height);
+      }
+      if (isInteriorView(mode)) {
+        if (!walkPosition) {
+          renderer.clear();
+          return;
+        }
+        const moving = mode === "walk" && stepWalk(timestamp);
+        walkCamera.position.set(walkPosition[0], walkEyeHeight, walkPosition[1]);
+        walkCamera.rotation.set(pitch, yaw, 0);
+        walkCamera.aspect = aspect;
+        walkCamera.fov = Math.min(75, Math.max(walkFieldOfView, 2 * THREE.MathUtils.radToDeg(Math.atan(0.96 / aspect))));
+        walkCamera.updateProjectionMatrix();
+        if (walkPost) walkPost.render();
+        else renderer.render(world, walkCamera);
+        if (moving) render();
+        return;
+      }
       const distance = 80;
       if (mode === "plan") {
         camera.up.set(0, 0, -1);
@@ -221,7 +537,6 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
       camera.top = center.y + vertical;
       camera.bottom = center.y - vertical;
       camera.updateProjectionMatrix();
-      renderer.setSize(element.clientWidth, element.clientHeight, false);
       renderer.render(world, camera);
     });
   }
@@ -237,7 +552,14 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
       annotations.add(ring);
     }
     const highlight = new Set([focusedItem, ...(issue?.itemIds || [])]);
-    itemMeshes.forEach((mesh) => mesh.material.color.setHex(highlight.has(mesh.userData.id) ? colors.selection : mesh.userData.color));
+    for (const mesh of itemMeshes) {
+      const selected = highlight.has(mesh.userData.id);
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material, idx) => {
+        const base = mesh.userData.materialColors?.[idx] ?? mesh.userData.color;
+        if (base !== undefined) material.color?.setHex(selected ? colors.selection : base);
+      });
+    }
     render();
   }
 
@@ -262,17 +584,86 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
   }
 
   function update(scene, { reset = false } = {}) {
+    const priorDoorState = model === scene && navigation ? new Map(doorMeshes.map((mesh) => [mesh.userData.openingId, mesh.userData.isOpen])) : new Map();
     model = scene;
     disposeGroup(layout);
     itemMeshes = [];
+    doorMeshes = [];
     if (reset) {
       focus(scene);
       theta = Math.PI / 7;
       phi = Math.PI / 4;
       measurements = [];
     }
-    scene.rooms.forEach((room, index) => layout.add(floor(room, colors.floors[index % colors.floors.length]), roomLabel(room)));
-    scene.walls.forEach((wall) => addWall(layout, wall, scene.openings.filter((opening) => opening.wallId === wall.id), mode === "plan" ? 0.08 : 1.12));
+    const walking = isInteriorView(mode);
+    annotations.visible = !walking;
+    hemisphere.visible = light.visible = !walking;
+    renderer.toneMapping = walking ? THREE.ACESFilmicToneMapping : THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = walking ? (styleId === "cream" ? 1.10 : 1.17) : 1;
+    windows = walking ? exteriorWindows(scene) : [];
+    lighting.update(scene, walking, windows);
+    if (walking && !appearance) {
+      appearance = createWalkAppearance(styleId, render, { visualProfile });
+      fitout = createWalkFitout();
+    }
+    if (walking && !postLoading) {
+      postLoading = true;
+      import("./walk-post.js?v=cream-v6-3").then(({ createWalkPost }) => {
+        if (disposed || contextLost) return;
+        walkPost = createWalkPost(renderer, world, walkCamera, { cream: styleId === "cream" });
+        if (viewportWidth && viewportHeight) walkPost?.resize(viewportWidth, viewportHeight);
+        if (isInteriorView(mode)) render();
+      }).catch(() => { /* Direct rendering is still available. */ });
+    }
+    if (walking && !furnitureReady) {
+      furnitureReady = loadWalkFurniture({ cream: styleId === "cream" }).then((assets) => {
+        if (disposed) { assets.dispose(); return; }
+        walkFurniture = assets;
+        if (isInteriorView(mode) && model) update(model);
+      }).catch(() => { /* Native furniture remains usable if a GLB cannot load. */ });
+    }
+    const heights = scene.walls.map((wall) => wall.heightM).filter((height) => height > 1.9).sort((a, b) => a - b);
+    const ceiling = heights[Math.floor(heights.length / 2)] || 2.7;
+    for (const [index, room] of scene.rooms.entries()) {
+      if (walking) {
+        const finish = appearance.floor(room);
+        layout.add(floor(room, finish.color, finish), floor(room, appearance.ceiling, { height: ceiling }));
+      } else {
+        layout.add(floor(room, colors.floors[index % colors.floors.length]), roomLabel(room));
+      }
+    }
+    scene.walls.forEach((wall) => addWall(layout, wall, scene.openings.filter((opening) => opening.wallId === wall.id),
+      walking ? Infinity : mode === "plan" ? 0.08 : 1.12, walking ? appearance : null, scene.rooms));
+    const roomsById = new Map(scene.rooms.map((room) => [room.id, room]));
+    const diningTables = walking ? scene.items.filter(isDiningTable) : [];
+    for (const item of scene.items) {
+      let facing;
+      if (walking && /餐椅|dining.?chair/i.test(item.name) && item.roomId) {
+        const nearby = diningTables.filter((table) => table.roomId === item.roomId).map((table) => [
+          table.center[0] - item.center[0], table.center[1] - item.center[1],
+        ]).sort((a, b) => Math.hypot(...a) - Math.hypot(...b))[0];
+        if (nearby && Math.hypot(...nearby) <= 1.8) facing = nearby;
+      }
+      const asset = walking && walkFurniture?.create(item, { facing, appearance });
+      if (asset) { layout.add(asset.group); itemMeshes.push(...asset.meshes); }
+      else itemMeshes.push(...furniture(layout, item, !walking, walking ? appearance : null, roomsById.get(item.roomId)));
+    }
+    if (walking) {
+      for (const mesh of itemMeshes) {
+        mesh.castShadow = !(Array.isArray(mesh.material) ? mesh.material.every((material) => material.transparent) : mesh.material.transparent);
+        mesh.receiveShadow = true;
+      }
+      fitout.add(layout, scene, windows, ceiling, appearance);
+      navigation = createWalkNavigation(scene, { eyeHeight, includeDoorLeaves: true });
+      for (const [id, open] of priorDoorState) navigation.setDoorOpen(id, open, walkPosition);
+      const living = scene.rooms.find((room) => /客(?:餐)?厅|living|lounge/i.test(room.name + room.id) && !room.excludeFromRoutes);
+      if (!walkPosition || reset || !navigation.canOccupy(walkPosition)) placeWalker(living?.id);
+      else lighting.setRoom(navigation.roomAt(walkPosition), windows.some((window) => window.room.id === walkRoomId));
+      reportWalkPosition();
+      scene.openings.forEach((opening) => drawWalkDoor(opening.id));
+      mark();
+      return;
+    }
     for (const opening of scene.openings.filter((opening) => opening.kind !== "window")) {
       line(layout, ...opening.segment, opening.excludedReason ? colors.issue : colors.opening, 0.035);
       if (!opening.hinge || !opening.swingSide || opening.excludedReason || opening.doorType !== "hinged") continue;
@@ -289,36 +680,78 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
         last = next;
       }
     }
-    for (const item of scene.items) itemMeshes.push(...furniture(layout, item));
     mark();
+  }
+
+  function drawWalkDoor(id) {
+    const leaf = navigation?.doorLeaf(id);
+    if (!leaf) return;
+    const { start: [x, z], end: [endX, endZ], sillM, heightM, thicknessM } = leaf;
+    const width = Math.hypot(endX - x, endZ - z);
+    if (width <= 0.025 || heightM <= 0.06) return;
+    const mesh = box(layout, (x + endX) / 2, sillM + heightM / 2, (z + endZ) / 2,
+      width, heightM - 0.022, thicknessM, 0xac8e6f, Math.atan2(endZ - z, endX - x), false);
+    applyBoxFinish(mesh, appearance.wood, width, heightM, thicknessM);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.userData.openingId = id;
+    mesh.userData.isOpen = leaf.open;
+    doorMeshes.push(mesh);
+  }
+
+  function toggleWalkDoor(mesh) {
+    const openingId = mesh.userData.openingId;
+    const opened = navigation.setDoorOpen(openingId, !mesh.userData.isOpen, walkPosition);
+    if (!opened) { onWalkNotice?.("门扇当前被挡住。请退开或检查附近家具。"); return; }
+    layout.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+    doorMeshes = doorMeshes.filter((entry) => entry !== mesh);
+    drawWalkDoor(openingId);
+    lighting.invalidateShadows();
+    onWalkNotice?.("");
+    render();
   }
 
   function eventRay(event) {
     const rect = renderer.domElement.getBoundingClientRect();
     const point = new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2);
-    raycaster.setFromCamera(point, camera);
+    raycaster.setFromCamera(point, isInteriorView(mode) && walkPosition ? walkCamera : camera);
     return raycaster;
   }
 
   const canvas = renderer.domElement;
   canvas.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    action = { startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY };
+    if (event.button !== 0 || action) return;
+    if (isInteriorView(mode)) canvas.focus({ preventScroll: true });
+    action = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY };
     canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener("pointermove", (event) => {
-    if (!action || mode === "plan" || measuring) return;
-    theta -= (event.clientX - action.x) * 0.012;
-    phi = THREE.MathUtils.clamp(phi + (event.clientY - action.y) * 0.007, 0.24, 1.35);
+    if (action?.pointerId !== event.pointerId || mode === "plan" || measuring) return;
+    const dx = event.clientX - action.x;
+    const dy = event.clientY - action.y;
+    if (Math.hypot(event.clientX - action.startX, event.clientY - action.startY) > 6) action.dragged = true;
+    if (isInteriorView(mode)) {
+      lookAround(-dx * 0.0045, -dy * 0.0045);
+    } else {
+      theta -= dx * 0.012;
+      phi = THREE.MathUtils.clamp(phi + dy * 0.007, 0.24, 1.35);
+    }
     action.x = event.clientX;
     action.y = event.clientY;
     render();
   });
   canvas.addEventListener("pointerup", (event) => {
-    if (!action) return;
-    const moved = Math.hypot(event.clientX - action.startX, event.clientY - action.startY);
+    if (action?.pointerId !== event.pointerId) return;
+    const dragged = action.dragged || Math.hypot(event.clientX - action.startX, event.clientY - action.startY) > 6;
     action = null;
-    if (moved > 6) return;
+    if (dragged) return;
+    if (isInteriorView(mode)) {
+      const hit = eventRay(event).intersectObjects(layout.children, true).find(({ object }) => object.isMesh);
+      if (mode === "walk" && hit?.object.userData.openingId && hit.distance <= 2.4) toggleWalkDoor(hit.object);
+      else if (hit?.object.userData.id) onItem?.(hit.object.userData.id);
+      return;
+    }
     if (measuring) {
       const hit = eventRay(event).ray.intersectPlane(ground, new THREE.Vector3());
       if (!hit) return;
@@ -331,36 +764,155 @@ export function createLayoutViewer(element, { onItem, onMeasure } = {}) {
     const mesh = eventRay(event).intersectObjects(itemMeshes)[0]?.object;
     if (mesh) onItem?.(mesh.userData.id);
   });
-  canvas.addEventListener("pointercancel", () => { action = null; });
+  for (const name of ["pointercancel", "lostpointercapture"]) canvas.addEventListener(name, (event) => {
+    if (action?.pointerId === event.pointerId) action = null;
+  });
   canvas.addEventListener("wheel", (event) => {
+    if (isInteriorView(mode)) return;
     event.preventDefault();
     zoom = THREE.MathUtils.clamp(zoom * Math.exp(-event.deltaY * 0.0015), 0.55, 4);
     render();
   }, { passive: false });
   canvas.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    if (mode === "panorama") {
+      if (!event.code.startsWith("Arrow")) return;
+      const horizontal = 0.14 * (Number(event.code === "ArrowLeft") - Number(event.code === "ArrowRight"));
+      const vertical = 0.14 * (Number(event.code === "ArrowUp") - Number(event.code === "ArrowDown"));
+      event.preventDefault();
+      lookAround(horizontal, vertical);
+      render();
+      return;
+    }
+    if (mode === "walk") {
+      if (event.code === "Escape") clearWalkInput();
+      if (!walkKeys.has(event.code)) return;
+      event.preventDefault();
+      heldKeys.add(event.code);
+      render();
+      return;
+    }
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") theta += event.key === "ArrowLeft" ? 0.16 : -0.16;
     else if (["+", "=", "-"].includes(event.key)) zoom = THREE.MathUtils.clamp(zoom * (event.key === "-" ? 0.85 : 1.18), 0.55, 4);
     else return;
     event.preventDefault();
     render();
   });
+  canvas.addEventListener("keyup", (event) => heldKeys.delete(event.code));
+  canvas.addEventListener("blur", clearWalkInput);
+  canvas.addEventListener("webglcontextlost", () => {
+    contextLost = true;
+    cancelAnimationFrame(frame);
+    frame = 0;
+    clearWalkInput();
+    onWalkNotice?.("正在恢复 3D 画面…");
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    contextLost = false;
+    walkPost?.dispose();
+    walkPost = null;
+    postLoading = true;
+    lighting.invalidateShadows();
+    onWalkNotice?.("");
+    render();
+  });
+  window.addEventListener("blur", clearWalkInput);
+  document.addEventListener("visibilitychange", clearWalkInput);
   const observer = new ResizeObserver(render);
   observer.observe(element);
+
+  async function capturePanorama() {
+    if (capturingPanorama) throw new Error("正在导出上一张全景。");
+    const room = walkPosition && navigation?.roomAt(walkPosition);
+    if (mode !== "panorama" || !room || room.excludeFromRoutes || !navigation.canOccupy(walkPosition)) {
+      throw new Error("请先在室内选择一个可环视的位置。");
+    }
+    const source = model;
+    const [x, z] = walkPosition;
+    const heightAtCapture = walkEyeHeight;
+    const heading = yaw;
+    capturingPanorama = true;
+    try {
+      const [{ captureWalkPanorama }, { tagEquirectangularJpeg }] = await Promise.all([
+        import("./walk-panorama-capture.js?v=panorama-preview-1"), import("./panorama-xmp.js"),
+        furnitureReady, appearance?.ready, lighting.ready(),
+      ]);
+      if (disposed || model !== source || mode !== "panorama" || navigation.roomAt(walkPosition)?.id !== room.id ||
+          !navigation.canOccupy([x, z])) throw new Error("当前站位已经变化，请重新导出。");
+      if (contextLost || renderer.getContext().isContextLost()) throw new Error("3D 画面正在恢复，请稍后再导出。");
+      const width = 4096;
+      const height = width / 2;
+      const jpeg = await captureWalkPanorama(renderer, world, { position: [x, heightAtCapture, z], yaw: heading, width });
+      const blob = await tagEquirectangularJpeg(jpeg, width, height);
+      return { blob, width, height, roomId: room.id, roomName: room.name };
+    } finally {
+      capturingPanorama = false;
+      render();
+    }
+  }
+
   return {
     update,
-    setMode(value) { mode = value; if (model) update(model); },
-    focusRoom(id) { const room = model?.rooms.find((room) => room.id === id); if (model) focus(room ? { rooms: [room], walls: [] } : model); },
+    capturePanorama,
+    async readyForWalk() {
+      await Promise.all([furnitureReady, appearance?.ready]);
+    },
+    setMode(value) {
+      if (mode === value) return;
+      const wasInside = isInteriorView(mode);
+      clearWalkInput();
+      action = null;
+      mode = value;
+      const inside = isInteriorView(mode);
+      canvas.setAttribute("aria-label", mode === "walk" ? "第一人称漫游，方向键移动，拖动转向"
+        : mode === "panorama" ? "实时全景，拖动或使用方向键环视房间" : "户型模型，拖动旋转，滚轮缩放");
+      if (wasInside && inside) {
+        if (mode === "walk") lookAround(0, 0);
+        render();
+      } else if (model) {
+        walkRoomId = undefined;
+        update(model);
+      }
+      if (inside) canvas.focus({ preventScroll: true });
+    },
+    focusRoom(id) {
+      if (isInteriorView(mode)) { placeWalker(id || null); render(); return; }
+      const room = model?.rooms.find((room) => room.id === id);
+      if (model) focus(room ? { rooms: [room], walls: [] } : model);
+    },
+    setWalkInput(direction, active) {
+      if (mode !== "walk") return;
+      if (active) touchDirections.add(direction);
+      else touchDirections.delete(direction);
+      render();
+    },
+    clearWalkInput,
     setMeasuring(value) { measuring = value; measurements = []; mark(); },
     highlight(id, point, itemIds) {
       focusedItem = id;
       issue = point ? { point, itemIds } : null;
-      if (point) {
+      if (point && !isInteriorView(mode)) {
         const [x, z] = point;
         const extent = 2.15;
         focus({ rooms: [{ polygon: [[x - extent, z - extent], [x + extent, z - extent], [x + extent, z + extent], [x - extent, z + extent]] }], walls: [] });
       }
       mark();
     },
-    dispose() { observer.disconnect(); cancelAnimationFrame(frame); disposeGroup(layout); disposeGroup(annotations); renderer.dispose(); canvas.remove(); },
+    dispose() {
+      disposed = true;
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener("blur", clearWalkInput);
+      document.removeEventListener("visibilitychange", clearWalkInput);
+      disposeGroup(layout);
+      disposeGroup(annotations);
+      walkFurniture?.dispose();
+      appearance?.dispose();
+      fitout?.dispose();
+      walkPost?.dispose();
+      lighting.dispose();
+      renderer.dispose();
+      canvas.remove();
+    },
   };
 }

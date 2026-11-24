@@ -1,5 +1,8 @@
-import { APP_CONFIG } from "./config.js?v=cloudflare-20261106";
+import { APP_CONFIG } from "./config.js?v=realtime-20261123";
 import { loadLayoutScene, toFloorPlan } from "./layout-review/scene.js";
+import { createVrBackgroundMusic } from "./vr-background-music.js";
+import { makeRealtimeShareUrl, readRealtimeShare, realtimeMusic, REALTIME_SESSION_KEY, requestRealtime } from "./realtime-projects.js";
+import { createRealtimeDesignSummary } from "./realtime-design-summary.js";
 
 const samples = [
   {
@@ -547,6 +550,12 @@ let isAccountLoggedIn = resolveAccountLoginState();
 let accountProfile = resolveAccountProfile();
 let availableSamples = samples.filter(isUserVisibleProjectSample).map(normalizeSampleState);
 let availableStyleSamples = [];
+let realtimeProjects = [];
+let realtimeLoadSequence = 0;
+let realtimeLoginAction = null;
+let activeRealtimeShareToken;
+let activeRealtimeShare;
+let realtimeFeedbackEvents;
 
 function isUserVisibleProjectSample(sample) {
   if (sample.templateOnly || (!canUseDesignerWorkspace && sample.designerOnly)) {
@@ -590,6 +599,7 @@ const inlineVrStatus = document.querySelector("[data-inline-vr-status]");
 const inlineVrAutoButton = document.querySelector("[data-inline-vr-auto]");
 const inlineVrResetButton = document.querySelector("[data-inline-vr-reset]");
 const inlineVrFullscreenButton = document.querySelector("[data-inline-vr-fullscreen]");
+const vrBackgroundMusic = createVrBackgroundMusic();
 const adjustImage = document.querySelector("#adjustImage");
 const adjustSceneTabs = document.querySelector("#adjustSceneTabs");
 const adjustScope = document.querySelector("[data-adjust-scope]");
@@ -600,6 +610,7 @@ const renderStatusPanel = document.querySelector("[data-render-status]");
 const renderFinalButton = document.querySelector("[data-render-final]");
 const clearAdjustmentsButton = document.querySelector("[data-clear-adjustments]");
 const versionList = document.querySelector("[data-version-list]");
+const realtimeExtras = document.querySelector("[data-realtime-version-extras]");
 const navButtons = [...document.querySelectorAll("[data-go-tab]")];
 const navGroups = [...document.querySelectorAll("[data-nav-group]")];
 const loginButton = document.querySelector("[data-login-action]");
@@ -655,6 +666,7 @@ let photoSphereStylePromise = null;
 let panoramaViewerEngine = "legacy";
 let panoramaViewerScenes = [];
 let panoramaViewerMapPoints = [];
+let panoramaViewerMusicPackage = null;
 let panoramaViewerRenderSpec = null;
 let panoramaViewerFloorPlan = null;
 let panoramaViewerFloorPlanImage = "";
@@ -1012,11 +1024,13 @@ let importedLayoutDraft = null;
 let activeImportLayout = null;
 let activeSchemeLayout = null;
 let activeSchemeLayoutKey = "";
+let activeSchemeLayoutMode = "";
 const schemeLayoutDrafts = new Map();
 let layoutLoadSequence = 0;
 const importLayoutButton = document.querySelector("[data-open-import-layout]");
 const importLayoutHolder = document.querySelector("[data-import-layout-review]");
 const schemeLayoutHolder = document.querySelector("[data-scheme-layout-review]");
+const schemeWalkthroughLinks = document.querySelector("[data-scheme-walkthrough]");
 let selectedStyleId = "";
 let effectBriefDocument = null;
 let isEditingEffectBrief = false;
@@ -1084,6 +1098,9 @@ updateGenerateState();
 setTab(activeTab);
 openRequestedProject();
 loadPublishedProjectSamples().then(loadPersistedProjectSamples).then(resumeCloudGeneration);
+if (/^#share=/.test(window.location.hash)) syncRealtimeShare();
+else loadRealtimeProjects().then(openRequestedRealtimeProject);
+window.addEventListener("hashchange", syncRealtimeShare);
 
 function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers);
@@ -1128,6 +1145,7 @@ function openRequestedProject() {
   if (hasOpenedRequestedProject) return;
   const query = new URLSearchParams(window.location.search);
   const requestedId = query.get("project");
+  if (/^rt-/.test(requestedId || "")) return;
   const sample = availableSamples.find((item) => item.id === requestedId);
   if (!sample) return;
   const version = sample.versions?.find((item) => item.id === query.get("version"));
@@ -1142,7 +1160,12 @@ function openRequestedProject() {
   hasOpenedRequestedProject = !query.get("version") || Boolean(version);
   renderSampleList();
   renderScheme();
-  setSchemePane(query.get("view") === "layout" && getActiveVersion(sample)?.layoutScene ? "layout" : version ? "preview" : getPreferredSchemePaneForSample(sample));
+  const view = query.get("view");
+  if (["layout", "walk", "panorama"].includes(view) && getActiveVersion(sample)?.layoutScene) {
+    setSchemePane("layout", { mode: view === "layout" ? "3d" : view, roomId: query.get("room") || "" });
+  } else {
+    setSchemePane(version ? "preview" : getPreferredSchemePaneForSample(sample));
+  }
   setTab("scheme-detail");
 }
 loadStaticPanoramaTemplateSamples();
@@ -1155,6 +1178,7 @@ function resolveAccountRole() {
 }
 
 function resolveAccountLoginState() {
+  if (window.sessionStorage.getItem(REALTIME_SESSION_KEY)) return true;
   if (APP_CONFIG.api.cloudAuth) return Boolean(window.sessionStorage.getItem("xspace-cloud-session"));
   const queryAuth = new URLSearchParams(window.location.search).get("auth");
   const storedAuth = window.localStorage.getItem(authStateStorageKey);
@@ -1200,7 +1224,8 @@ function applyAuthState() {
 }
 
 function handleLoginAction() {
-  openLoginDialog();
+  if (canUseDesignerWorkspace && APP_CONFIG.api?.realtimeBaseUrl) requireRealtimeLogin(() => {});
+  else openLoginDialog();
 }
 
 function openLoginDialog(nextTab = "") {
@@ -1221,6 +1246,7 @@ function closeLoginDialog() {
   loginDialog.hidden = true;
   body.classList.remove("is-login-dialog-open");
   pendingLoginTab = "";
+  realtimeLoginAction = null;
   setLoginSubmitting(false);
 }
 
@@ -1277,6 +1303,7 @@ function persistPicWishAccount(data) {
 
 function clearPicWishAccount() {
   window.sessionStorage.removeItem("xspace-cloud-session");
+  realtimeLoadSequence += 1;
   isAccountLoggedIn = false;
   accountProfile = {};
   window.localStorage.removeItem(authStateStorageKey);
@@ -1285,6 +1312,13 @@ function clearPicWishAccount() {
   window.localStorage.removeItem(accountProfileStorageKey);
   delete window.XSPACE_PICWISH_API_TOKEN;
   delete window.XSPACE_PICWISH_AUTHORIZATION;
+  realtimeProjects = [];
+  availableSamples = availableSamples.filter((sample) => !sample.realtime);
+  if (activeSampleId.startsWith("rt-")) {
+    activeSampleId = availableSamples[0]?.id || "";
+    setTab("samples");
+  }
+  renderSampleList();
   applyAuthState();
   if (requiresLoginForTab(activeTab)) {
     setTab("samples");
@@ -1327,7 +1361,10 @@ async function handleLoginSubmit(event) {
     return;
   }
 
-  const endpoint = APP_CONFIG.api.cloudAuth ? `${getApiBaseUrl()}/api/v1/auth/login` : getLoginEndpoint();
+  const afterRealtimeLogin = realtimeLoginAction;
+  const useCloudSession = APP_CONFIG.api.cloudAuth || Boolean(afterRealtimeLogin);
+  const loginBase = afterRealtimeLogin ? getRealtimeApiBaseUrl() : getApiBaseUrl();
+  const endpoint = useCloudSession ? `${loginBase}/api/v1/auth/login` : getLoginEndpoint();
   if (!endpoint) {
     setLoginStatus("登录接口待接入，收到接口后会在这里提交账号密码。");
     return;
@@ -1353,7 +1390,7 @@ async function handleLoginSubmit(event) {
       }),
     });
     const payload = await response.json().catch(() => ({}));
-    if (APP_CONFIG.api.cloudAuth) {
+    if (useCloudSession) {
       if (!response.ok || !payload.token) throw new Error(payload.detail || "云端登录失败。");
       window.sessionStorage.setItem("xspace-cloud-session", payload.token);
       accountProfile = payload.profile || {};
@@ -1370,6 +1407,8 @@ async function handleLoginSubmit(event) {
       setTab(targetTab);
     }
     if (APP_CONFIG.api.cloudAuth) resumeCloudGeneration();
+    if (useCloudSession) await loadRealtimeProjects();
+    if (afterRealtimeLogin) await afterRealtimeLogin();
   } catch (error) {
     setLoginStatus(error.message || "登录失败，请稍后重试。");
   } finally {
@@ -1479,6 +1518,16 @@ async function loadPersistedProjectSamples() {
       .map((sample) => {
         const published = availableSamples.find((item) => item.id === sample.id && !item.persisted);
         if (published) {
+          sample.versions = sample.versions.map((version) => {
+            const publishedVersion = published.versions.find(({ id }) => id === version.id);
+            return publishedVersion?.realtimeWalkthrough
+              ? {
+                ...version, realtimeWalkthrough: true,
+                layoutScene: version.layoutScene || publishedVersion.layoutScene,
+                visualProfile: version.visualProfile || publishedVersion.visualProfile,
+              }
+              : version;
+          });
           const serverVersionIds = new Set(sample.versions.map((version) => version.id));
           const serverVersionNumbers = new Set(sample.versions.map((version) => version.number));
           const newerPublished = published.versions.filter((version) => !serverVersionIds.has(version.id) && !serverVersionNumbers.has(version.number));
@@ -1582,6 +1631,8 @@ function normalizePersistedVersion(version) {
     generationJobId: version.generation_job_id || "",
     qualityReport: version.quality_report || null,
     layoutScene: version.layoutScene || version.layout_scene || null,
+    realtimeWalkthrough: version.realtimeWalkthrough === true || version.realtime_walkthrough === true,
+    visualProfile: version.visualProfile || version.visual_profile || null,
   };
 }
 
@@ -1800,10 +1851,6 @@ function bindNavigation() {
   document.querySelectorAll("[data-go-tab]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
-      if (requiresLoginForTab(button.dataset.goTab) && !isAccountLoggedIn) {
-        openLoginDialog(button.dataset.goTab);
-        return;
-      }
       setTab(button.dataset.goTab);
     });
   });
@@ -1884,6 +1931,8 @@ function bindImportWorkflow() {
   inlineVrAutoButton?.addEventListener("click", toggleInlineVrAutoRotate);
   inlineVrResetButton?.addEventListener("click", resetInlineVrView);
   inlineVrFullscreenButton?.addEventListener("click", openInlineVrFullscreen);
+  vrBackgroundMusic.attach(document.querySelector("[data-inline-vr-music]"));
+  window.addEventListener("pagehide", vrBackgroundMusic.pause);
   manualAdjustmentInput?.addEventListener("input", handleManualAdjustmentInput);
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !effectBriefViewer?.hidden) {
@@ -1899,6 +1948,8 @@ function bindImportWorkflow() {
     importLayoutHolder.textContent = error?.message || "暂时无法打开 3D 校对。";
   }));
   generateButton?.addEventListener("click", handleGeneratePlan);
+  const output = document.querySelector("[data-generation-output]");
+  if (output && APP_CONFIG.api?.realtimeBaseUrl) output.textContent = "按户型和需求生成可编辑的实时 3D 方案。";
   renderFinalButton?.addEventListener("click", handleRenderFinalVersion);
   clearAdjustmentsButton?.addEventListener("click", clearCurrentAdjustments);
 }
@@ -1923,6 +1974,12 @@ function syncDesignIdeaForSelectedStyle() {
     return;
   }
 
+  if (APP_CONFIG.api?.realtimeBaseUrl) {
+    if (!designIdeaInput.value.trim() && effectBriefDocument?.content) {
+      designIdeaInput.value = normalizeEffectBriefText(effectBriefDocument.content);
+    }
+    return;
+  }
   designIdeaInput.value = getDesignIdeaForStyle(selectedStyleId);
 }
 
@@ -1965,16 +2022,48 @@ async function handleGeneratePlan() {
     return;
   }
 
+  const realtimeGeneration = Boolean(APP_CONFIG.api?.realtimeBaseUrl);
+  if (realtimeGeneration && !requireRealtimeLogin(handleGeneratePlan)) return;
+
   isGeneratingPlan = true;
   generateButton.textContent = "生成中";
   setGenerationStatus({
     status: "running",
     title: "正在生成第一版方案",
-    messages: [effectBriefDocument ? "解析户型图和效果说明" : "解析户型图和默认设计想法", `套用${stylePackage.label}风格规则`, "生成整屋设计状态和各区域全景任务"],
+    messages: [effectBriefDocument ? "解析户型图和效果说明" : "解析户型图", `套用${stylePackage.label}风格规则`,
+      realtimeGeneration ? "生成实时 3D 场景并保存 V1" : "生成整屋设计状态和各区域全景任务"],
   });
   updateGenerateState();
 
   try {
+    if (realtimeGeneration) {
+      const [{ fromFloorPlan }, { planRealtimeDesign }] = await Promise.all([
+        import("./layout-review/realtime-scene.js"), import("./layout-review/design-plan.js"),
+      ]);
+      let source = importedLayout && (importedLayoutDraft || importedLayout.scene);
+      if (!source) {
+        const name = floorFile.name.replace(/\.[^.]+$/, "");
+        let parsedFloor;
+        if (getFileExtension(floorFile.name) === ".dxf") {
+          try { parsedFloor = buildStandardDxfLayout(inspectDxfContent(await floorFile.text())); }
+          catch (error) {
+            const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage).catch(() => { throw error; });
+            validateDraftAgainstEffectBrief(draft);
+            parsedFloor = draft.floor_plan;
+          }
+        } else {
+          const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage);
+          validateDraftAgainstEffectBrief(draft);
+          parsedFloor = draft.floor_plan;
+        }
+        source = fromFloorPlan(parsedFloor, { name });
+      }
+      const brief = String(designIdeaInput?.value || "").trim().slice(0, 3000);
+      const { layout, design } = planRealtimeDesign(source, brief);
+      const { project } = await createRealtimeProject(layout, { styleId: selectedStyleId, brief, design });
+      setGenerationStatus({ status: "complete", title: "已生成实时 3D 方案", messages: [`${project.title} · V1`] });
+      return;
+    }
     const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage);
     validateDraftAgainstEffectBrief(draft);
     const generatedStylePackage = stylePackages[draft?.design_plan?.style] || stylePackage;
@@ -4066,7 +4155,7 @@ function clearImportedLayout() {
 async function openImportedLayout() {
   const current = importedLayout;
   if (!current) return;
-  const { createLayoutWorkspace } = await import("./layout-review/workspace.js");
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=cream-v6-3");
   if (current !== importedLayout) return;
   importLayoutHolder.hidden = false;
   if (!activeImportLayout) {
@@ -4088,7 +4177,7 @@ async function importLidarFloor(file, runId) {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
     const key = `import:${Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("")}`;
     if (runId !== floorValidationRunId) return;
-    const { readLayoutDraft } = await import("./layout-review/workspace.js");
+    const { readLayoutDraft } = await import("./layout-review/workspace.js?v=cream-v6-3");
     if (runId !== floorValidationRunId) return;
     importedLayout = { scene, key };
     importedLayoutDraft = readLayoutDraft(key) || scene;
@@ -4161,7 +4250,7 @@ async function validateFloorFile(input, files = input.files) {
     return;
   }
 
-  if (shouldUseBackendFloorValidation(extension)) {
+  if (shouldUseBackendFloorValidation(extension) && !(extension === ".dxf" && APP_CONFIG.api?.realtimeBaseUrl)) {
     try {
       const apiResult = await validateFloorFileWithApi(file);
       if (runId !== floorValidationRunId) {
@@ -4223,7 +4312,15 @@ async function validateFloorFile(input, files = input.files) {
 
   const report = inspectDxfContent(content);
   renderFloorPreview(report.drawing, file.name);
-  const result = buildFloorValidationResult(report);
+  let result = buildFloorValidationResult(report);
+  if (extension === ".dxf" && APP_CONFIG.api?.realtimeBaseUrl) {
+    try {
+      const layout = buildStandardDxfLayout(report);
+      result = { status: "valid", title: "已读取实时 3D 户型", messages: [
+        `${layout.room_boundaries.length} 个封闭空间 · ${layout.walls.length} 段墙体`, ...layout.parser_warnings,
+      ] };
+    } catch { /* The standard checker retains useful layer diagnostics. */ }
+  }
   importState.floor = result.status === "valid";
   selectedFloorFile = result.status === "valid" ? file : null;
   setFloorValidation(result);
@@ -4432,6 +4529,312 @@ function getApiBaseUrl() {
   return APP_CONFIG.api?.baseUrl?.replace(/\/$/, "") ?? "";
 }
 
+function getRealtimeApiBaseUrl() {
+  return APP_CONFIG.api?.realtimeBaseUrl?.replace(/\/$/, "") || getApiBaseUrl();
+}
+
+function requireRealtimeLogin(action) {
+  if (sessionStorage.getItem(REALTIME_SESSION_KEY)) return true;
+  openLoginDialog();
+  realtimeLoginAction = action;
+  setLoginStatus("请登录设计师账号，方案将保存在你的工作台。", "info");
+  return false;
+}
+
+async function realtimeApi(path, options) {
+  const session = options?.shared ? null : sessionStorage.getItem(REALTIME_SESSION_KEY);
+  const sessionIsCurrent = () => options?.shared || session === sessionStorage.getItem(REALTIME_SESSION_KEY);
+  let result;
+  try {
+    result = await requestRealtime(getRealtimeApiBaseUrl(), path, options);
+  } catch (error) {
+    if (!sessionIsCurrent()) throw new DOMException("工作台账号已切换。", "AbortError");
+    if (!options?.shared && error.status === 401) {
+      sessionStorage.removeItem(REALTIME_SESSION_KEY);
+      realtimeLoadSequence += 1;
+      isAccountLoggedIn = resolveAccountLoginState();
+      realtimeProjects = [];
+      availableSamples = availableSamples.filter((sample) => !sample.realtime);
+      applyAuthState();
+      renderSampleList();
+    }
+    throw error;
+  }
+  if (!sessionIsCurrent()) throw new DOMException("工作台账号已切换。", "AbortError");
+  return result;
+}
+
+async function loadRealtimeProjects() {
+  if (!canUseDesignerWorkspace || !sessionStorage.getItem(REALTIME_SESSION_KEY)) return;
+  try {
+    const { projects } = await realtimeApi("/realtime-projects");
+    realtimeProjects = projects;
+    renderSampleList();
+  } catch (error) {
+    if (error.status !== 401 && error.name !== "AbortError") console.warn("实时方案列表加载失败。", error.message);
+  }
+}
+
+function openRequestedRealtimeProject() {
+  const query = new URLSearchParams(window.location.search);
+  const projectId = query.get("project");
+  const versionId = query.get("version");
+  if (!/^rt-[a-f0-9]{32}$/.test(projectId || "") || (versionId && !/^rv-[a-f0-9]{32}$/.test(versionId))) return;
+  const open = () => openRealtimeProject(projectId, versionId).catch(showRealtimeProjectError);
+  if (requireRealtimeLogin(open)) return open();
+}
+
+function showRealtimeProjectError(error) {
+  if (error.name === "AbortError") return;
+  const message = document.createElement("p");
+  message.className = "realtime-list-notice";
+  message.setAttribute("role", "status");
+  message.textContent = error.message || "无法打开实时方案。";
+  sampleList.querySelector(".realtime-list-notice")?.remove();
+  sampleList.prepend(message);
+  setTab("samples");
+}
+
+async function openRealtimeProject(projectId, versionId = null) {
+  const attempt = ++realtimeLoadSequence;
+  const path = `/realtime-projects/${projectId}`;
+  const record = await realtimeApi(path);
+  if (attempt !== realtimeLoadSequence) return;
+  if (versionId && record.version.id !== versionId) {
+    record.version = (await realtimeApi(`${path}/versions/${versionId}`)).version;
+  }
+  if (attempt !== realtimeLoadSequence || !sessionStorage.getItem(REALTIME_SESSION_KEY)) return;
+  showRealtimeProject(record);
+}
+
+function showRealtimeProject({ project, version, versions = [version] }) {
+  const layout = loadLayoutScene(version.layout);
+  const style = stylePackages[version.styleId]?.label || "室内方案";
+  const cover = "./assets/showcase/new-plan-cover-cream.jpg";
+  const rooms = layout.rooms.filter((room) => !room.excludeFromRoutes).map((room) => ({
+    id: room.id, name: room.name, image: cover, alt: room.name, adjustable: false,
+  }));
+  const rtVersions = versions.map((entry) => ({
+    ...entry, ...(entry.id === version.id ? { brief: version.brief, design: version.design } : {}),
+    title: `V${entry.number} · 实时 3D`, previewLabel: "实时 3D 漫游", scenes: rooms,
+    layoutScene: entry.id === version.id ? layout : null, deliverable: false,
+  }));
+  const sample = {
+    id: project.id, name: project.title, title: "室内漫游", status: `V${version.number} · 实时 3D`, style,
+    phase: "review", delivery: "实时 3D 漫游", area: `${rooms.length} 个空间`, realtime: true,
+    rooms, initialScenes: rooms, plannedScenes: rooms, versions: rtVersions,
+    activeVersionId: version.id, serverActiveVersionId: project.activeVersionId, adjustments: [],
+  };
+  realtimeProjects = [project, ...realtimeProjects.filter((entry) => entry.id !== project.id)];
+  availableSamples = [sample, ...availableSamples.filter((entry) => entry.id !== sample.id)];
+  activeSampleId = sample.id;
+  activeRoomId = rooms[0]?.id || "";
+  closeSchemeLayout();
+  renderSampleList();
+  renderScheme();
+  setSchemePane("layout");
+  setTab("scheme-detail");
+  const url = new URL(window.location.pathname, window.location.origin);
+  url.search = new URLSearchParams({ project: project.id, version: version.id }).toString();
+  window.history.replaceState(null, "", url);
+}
+
+async function createRealtimeProject(layout, { title, styleId, brief, design } = {}) {
+  const record = await realtimeApi("/realtime-projects", { method: "POST", body: {
+    title: title || layout.name, styleId: styleId || "cream", layout, musicId: "woodlight", ...(brief ? { brief } : {}),
+    ...(design && (design.applied.length || design.needsReview.length) ? { design } : {}),
+  } });
+  showRealtimeProject(record);
+  return record;
+}
+
+function showRealtimeShareError(message) {
+  body.dataset.realtimeShare = "true";
+  setTab("realtime-share");
+  document.querySelector("[data-realtime-share-title]").textContent = "无法打开方案";
+  document.querySelector("[data-realtime-share-version]").textContent = "";
+  document.querySelector("[data-realtime-share-stage]").replaceChildren(createEmptyState("此方案暂时不可查看", message));
+}
+
+function syncRealtimeShare() {
+  const hasLink = /^#share=/.test(window.location.hash);
+  if (!hasLink && !body.dataset.realtimeShare) return;
+  const token = readRealtimeShare(window.location.hash);
+  if (token && token === activeRealtimeShareToken) return;
+  activeRealtimeShareToken = token;
+  activeRealtimeShare?.dispose();
+  activeRealtimeShare = null;
+  realtimeFeedbackEvents?.abort();
+  const form = document.querySelector("[data-realtime-share-feedback]");
+  form.hidden = true;
+  form.reset();
+  form.closest("details")?.removeAttribute("open");
+  form.querySelector("button[type=submit]").disabled = false;
+  form.querySelector("[data-realtime-feedback-status]").textContent = "";
+  if (token) openRealtimeShare(token);
+  else if (hasLink) showRealtimeShareError("分享链接不完整。");
+  else {
+    delete body.dataset.realtimeShare;
+    setTab("samples");
+    loadRealtimeProjects().then(openRequestedRealtimeProject);
+  }
+}
+
+async function openRealtimeShare(token) {
+  body.dataset.realtimeShare = "true";
+  setTab("realtime-share");
+  const stage = document.querySelector("[data-realtime-share-stage]");
+  const form = document.querySelector("[data-realtime-share-feedback]");
+  stage.replaceChildren();
+  document.querySelector("[data-realtime-share-title]").textContent = "正在打开方案";
+  document.querySelector("[data-realtime-share-version]").textContent = "实时 3D 漫游";
+  const events = new AbortController();
+  realtimeFeedbackEvents = events;
+  try {
+    const [{ project, version }, { createLayoutWorkspace }] = await Promise.all([
+      realtimeApi(`/realtime-shares/${token}`, { shared: true }), import("./layout-review/workspace.js?v=cream-v6-3"),
+    ]);
+    if (events.signal.aborted) return;
+    const model = loadLayoutScene(version.layout);
+    const style = stylePackages[version.styleId]?.label || "室内方案";
+    document.querySelector("[data-realtime-share-title]").textContent = project.title.replace(/\s*·\s*(?:CAD\s+)?实时漫游$/u, "") || project.title;
+    document.querySelector("[data-realtime-share-version]").textContent = `V${version.number} · ${style}`;
+    const anchorLabel = form.querySelector("[data-realtime-feedback-anchor]");
+    const status = form.querySelector("[data-realtime-feedback-status]");
+    let selectedItem = null;
+    let roomId = null;
+    function updateAnchor() {
+      const room = model.rooms.find((entry) => entry.id === (selectedItem?.roomId || roomId));
+      const names = [room?.name, selectedItem?.name].filter(Boolean).join(" · ");
+      anchorLabel.textContent = names ? `反馈位置 · ${names}` : "可以先在漫游里选择一件家具。";
+    }
+    activeRealtimeShare = createLayoutWorkspace(stage, {
+      source: model, key: `share:${version.id}`, readOnly: true, initialMode: "walk", styleId: version.styleId,
+      music: realtimeMusic(version.musicId, project.id, version.id),
+      onWalkRoom(id) { roomId = id; updateAnchor(); },
+      onSelectItem(id) { selectedItem = model.items.find((entry) => entry.id === id) || null; updateAnchor(); },
+    });
+    form.hidden = false;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = form.elements.namedItem("message");
+      const button = form.querySelector("button[type=submit]");
+      const message = input.value.trim();
+      if (!message) { status.textContent = "请填写反馈。"; input.focus(); return; }
+      button.disabled = true;
+      status.textContent = "正在发送…";
+      try {
+        await realtimeApi(`/realtime-shares/${token}/feedback`, { method: "POST", shared: true, body: {
+          message, roomId: selectedItem ? selectedItem.roomId : roomId, itemId: selectedItem?.id || null,
+        } });
+        if (events.signal.aborted) return;
+        input.value = "";
+        selectedItem = null;
+        updateAnchor();
+        status.textContent = "反馈已提交给设计师。";
+      } catch (error) {
+        if (!events.signal.aborted) status.textContent = error.message || "反馈提交失败，请重试。";
+      } finally { if (!events.signal.aborted) button.disabled = false; }
+    }, { signal: events.signal });
+  } catch (error) {
+    if (!events.signal.aborted) showRealtimeShareError(error.message || "分享链接不可用。");
+  }
+}
+
+function realtimeVersionPath(sample, version) {
+  return `/realtime-projects/${sample.id}/versions/${version.id}`;
+}
+
+async function shareRealtimeVersion(sample, version) {
+  const field = realtimeExtras.querySelector("[data-realtime-copy-link]");
+  const { token, shareId } = await realtimeApi(`${realtimeVersionPath(sample, version)}/shares`, { method: "POST" });
+  const link = makeRealtimeShareUrl(token);
+  if (field?.isConnected) {
+    field.hidden = false;
+    field.value = link;
+    field.dataset.shareId = shareId;
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    return "版本分享链接已复制。";
+  } catch {
+    field?.focus();
+    field?.select();
+    return "版本分享链接已生成。";
+  }
+}
+
+function renderRealtimeExtras(sample, version) {
+  realtimeExtras.hidden = !sample.realtime;
+  realtimeExtras.replaceChildren();
+  if (!sample.realtime) return;
+  const designSummary = createRealtimeDesignSummary(version.design, version.layoutScene, version.brief);
+  if (designSummary) realtimeExtras.append(designSummary);
+  const link = document.createElement("input");
+  link.dataset.realtimeCopyLink = "";
+  link.setAttribute("aria-label", "当前版本的可分享链接");
+  link.type = "url";
+  link.readOnly = true;
+  link.hidden = true;
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "客户反馈与分享管理";
+  const contents = document.createElement("div");
+  details.append(summary, contents);
+  realtimeExtras.append(link, details);
+
+  async function loadFeedback() {
+    const path = realtimeVersionPath(sample, version);
+    contents.textContent = "正在读取此版本的反馈和链接…";
+    try {
+      const [{ feedback }, { shares }] = await Promise.all([
+        realtimeApi(`${path}/feedback`), realtimeApi(`${path}/shares`),
+      ]);
+      if (!contents.isConnected) return;
+      contents.replaceChildren();
+      if (version.brief && !designSummary) {
+        const note = document.createElement("p");
+        note.className = "realtime-brief";
+        note.textContent = version.brief;
+        contents.append(note);
+      }
+      const feedbackList = document.createElement("ul");
+      for (const entry of feedback) {
+        const item = document.createElement("li");
+        const target = [version.layoutScene.rooms.find(({ id }) => id === entry.roomId)?.name,
+          version.layoutScene.items.find(({ id }) => id === entry.itemId)?.name].filter(Boolean).join(" · ");
+        item.textContent = target ? `${target} — ${entry.message}` : entry.message;
+        feedbackList.append(item);
+      }
+      if (feedback.length) contents.append(feedbackList);
+      else contents.append(document.createTextNode("这个版本还没有收到反馈。"));
+
+      const shareList = document.createElement("ul");
+      for (const entry of shares.filter(({ revokedAt }) => !revokedAt)) {
+        const row = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `分享于 ${new Date(entry.createdAt).toLocaleString("zh-CN")}`;
+        const revoke = document.createElement("button");
+        revoke.className = "layout-action";
+        revoke.textContent = "停用链接";
+        revoke.type = "button";
+        revoke.addEventListener("click", async () => {
+          revoke.disabled = true;
+          try {
+            await realtimeApi(`${path}/shares/${entry.shareId}/revoke`, { method: "POST" });
+            if (link.dataset.shareId === entry.shareId) { link.value = ""; link.hidden = true; }
+            await loadFeedback();
+          } catch (error) { revoke.textContent = error.message || "停用失败"; revoke.disabled = false; }
+        });
+        row.append(label, revoke);
+        shareList.append(row);
+      }
+      if (shareList.childElementCount) contents.append(shareList);
+    } catch (error) { contents.textContent = error.message || "无法读取反馈。"; }
+  }
+  details.addEventListener("toggle", () => { if (details.open) loadFeedback(); });
+}
+
 function inspectDxfContent(content) {
   const lines = content.split(/\r\n|\n|\r/);
   const entities = [];
@@ -4496,6 +4899,53 @@ function inspectDxfContent(content) {
     roleStats,
     drawing,
   };
+}
+
+function buildStandardDxfLayout(report) {
+  if (!report.hasEntitiesSection || !report.hasEof || (report.insunits && report.insunits !== dxfMillimeterInsunits)) {
+    throw new Error("实时 3D 需要完整的毫米制 DXF。");
+  }
+  const walls = [];
+  const columns = [];
+  const roomBoundaries = [];
+  const roomLabels = [];
+  const doors = [];
+  const windows = [];
+  let ambiguousOpenings = 0;
+  for (const entity of report.modelspaceEntities) {
+    const role = classifyDxfLayer(entity.layer);
+    if (role === "room_boundary" && entity.type === "LWPOLYLINE" && entity.closed && entity.points.length >= 3) {
+      roomBoundaries.push({ polygon: entity.points });
+    } else if (role === "room_text" && isPoint(entity.position) && entity.text) {
+      roomLabels.push({ name: entity.text, position: entity.position });
+    } else if (role === "wall" || role === "column") {
+      const list = role === "wall" ? walls : columns;
+      if (entity.type === "LINE" && isPoint(entity.start) && isPoint(entity.end)) list.push({ start: entity.start, end: entity.end });
+      if (entity.type === "LWPOLYLINE") {
+        const points = entity.closed ? [...entity.points, entity.points[0]] : entity.points;
+        for (let i = 1; i < points.length; i += 1) list.push({ start: points[i - 1], end: points[i] });
+      }
+    } else if (role === "door" || role === "window") {
+      const segment = entity.type === "LINE" ? [entity.start, entity.end]
+        : entity.type === "LWPOLYLINE" && entity.points.length === 2 ? entity.points : [];
+      if (segment.length !== 2 || !segment.every(isPoint)) { ambiguousOpenings += 1; continue; }
+      const [start, end] = segment;
+      const width = Math.hypot(end.x - start.x, end.y - start.y);
+      if (width < 400 || width > 4000) { ambiguousOpenings += 1; continue; }
+      (role === "door" ? doors : windows).push({ start, end, width, kind: role });
+    }
+  }
+  if (!walls.length || !roomBoundaries.length) throw new Error("图纸缺少可直接建模的墙线或闭合房间多段线。");
+  const specifiedHeight = Number(effectBriefDocument?.parsed?.floorHeight);
+  const heightKnown = Number.isFinite(specifiedHeight) && specifiedHeight >= 2100 && specifiedHeight <= 6000;
+  const warnings = [
+    ...(heightKnown ? [] : ["图纸没有层高，预览暂按 2800 毫米。"]),
+    ...(report.insunits ? [] : ["图纸未声明单位，按本平台的毫米制图纸规范读取。"]),
+    ...(ambiguousOpenings ? [`${ambiguousOpenings} 个门窗图元缺少可确定的洞口线，建议对照原图补齐。`] : []),
+    ...(doors.length ? [] : ["未从门图层读取到有效洞口线，房间之间的通行需对照图纸复核。"]),
+  ];
+  return { unit: "mm", floor_height: heightKnown ? specifiedHeight : 2800, walls, columns, doors, windows,
+    room_boundaries: roomBoundaries, room_labels: roomLabels, parser_warnings: warnings };
 }
 
 function createDxfEntity(type) {
@@ -5407,10 +5857,12 @@ function requiresLoginForTab(tab) {
 }
 
 function setTab(tab) {
+  if (body.dataset.realtimeShare && tab !== "realtime-share") return;
   const nextTab = panels.some((panel) => panel.dataset.panel === tab) ? tab : "samples";
   if (!canUseDesignerWorkspace && isDesignerTab(nextTab)) {
     return;
   }
+  if (nextTab === "platform" && APP_CONFIG.api?.realtimeBaseUrl && !requireRealtimeLogin(() => setTab(nextTab))) return;
   if (requiresLoginForTab(nextTab) && !isAccountLoggedIn) {
     openLoginDialog(nextTab);
     return;
@@ -5435,6 +5887,7 @@ function setTab(tab) {
   });
 
   window.scrollTo({ top: 0, left: 0 });
+  syncVrBackgroundMusic();
 }
 
 function closeSchemeLayout() {
@@ -5442,49 +5895,92 @@ function closeSchemeLayout() {
   activeSchemeLayout?.dispose();
   activeSchemeLayout = null;
   activeSchemeLayoutKey = "";
+  activeSchemeLayoutMode = "";
 }
 
-async function renderSchemeLayout(sample, version) {
+async function renderSchemeLayout(sample, version, initialMode, initialRoomId) {
   const key = `${sample.id}:${version.id}`;
-  if (activeSchemeLayoutKey === key) return;
+  if (activeSchemeLayoutKey === key && activeSchemeLayoutMode === initialMode) return;
   closeSchemeLayout();
   const attempt = layoutLoadSequence;
   activeSchemeLayoutKey = key;
-  const { createLayoutWorkspace } = await import("./layout-review/workspace.js");
+  activeSchemeLayoutMode = initialMode;
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=cream-v6-3");
   if (attempt !== layoutLoadSequence) return;
-  activeSchemeLayout = createLayoutWorkspace(schemeLayoutHolder, { source: version.layoutScene, key, draft: schemeLayoutDrafts.get(key),
-    onSceneChange(scene) { schemeLayoutDrafts.set(key, scene); } });
+  const styleId = version.styleId || Object.keys(stylePackages).find((id) => stylePackages[id].label === sample.style) || "cream";
+  const musicId = version.musicId ?? (sample.id === "jindi-dacheng-119-cream-v1" ? "woodlight" : null);
+  const readOnly = !canUseDesignerWorkspace || (version.realtimeWalkthrough === true && initialMode !== "3d");
+  const canSave = Boolean(APP_CONFIG.api?.realtimeBaseUrl);
+  async function saveVersion(scene) {
+    if (!sample.realtime) {
+      await createRealtimeProject(scene, { title: sample.name, styleId });
+      return "已将此布局保存为独立项目的 V1。";
+    }
+    const result = await realtimeApi(`/realtime-projects/${sample.id}/versions`, { method: "POST", body: {
+      baseVersionId: version.id, expectedActiveVersionId: sample.serverActiveVersionId, layout: scene,
+    } });
+    schemeLayoutDrafts.delete(key);
+    try { localStorage.removeItem(`xspace:layout:${key}`); } catch { /* Saving the version does not depend on browser storage. */ }
+    if (activeSchemeLayoutKey === key) showRealtimeProject({ ...result, versions: [result.version, ...sample.versions] });
+    else await loadRealtimeProjects();
+  }
+  renderRealtimeExtras(sample, version);
+  const firstScene = version.visualProfile ? version.scenes?.[0] : null;
+  activeSchemeLayout = createLayoutWorkspace(schemeLayoutHolder, {
+    source: version.layoutScene, key, draft: schemeLayoutDrafts.get(key), styleId, readOnly, initialMode,
+    initialRoomId: initialRoomId || firstScene?.roomId || firstScene?.id || "",
+    visualProfile: version.visualProfile,
+    music: realtimeMusic(musicId, sample.id, version.id),
+    panoramaCaptureLabel: version.realtimeWalkthrough ? `${sample.name}-${sample.style}-V${version.number}` : null,
+    onSceneChange(scene) { schemeLayoutDrafts.set(key, scene); },
+    onSaveVersion: canSave && !readOnly ? async (scene) => {
+      const afterLogin = () => saveVersion(scene).catch(showRealtimeProjectError);
+      if (!requireRealtimeLogin(afterLogin)) throw new Error("登录后继续保存到工作台。");
+      return saveVersion(scene);
+    } : null,
+    allowSaveUnchanged: !sample.realtime, saveVersionLabel: sample.realtime ? "保存为新版本" : "从此布局创建方案",
+    onShareVersion: sample.realtime ? () => shareRealtimeVersion(sample, version) : null,
+  });
 }
 
-function setSchemePane(pane) {
+function setSchemePane(pane, { mode, roomId = "" } = {}) {
   const sample = getActiveSample();
   const version = getActiveVersion(sample);
-  const layoutAvailable = Boolean(version?.layoutScene && canUseDesignerWorkspace);
-  const targetPane = pane === "layout" && !layoutAvailable ? "preview"
+  const hasWalkthrough = Boolean(version?.realtimeWalkthrough && version.layoutScene);
+  const layoutAvailable = Boolean(version?.layoutScene && (canUseDesignerWorkspace || hasWalkthrough));
+  const targetPane = sample?.realtime && layoutAvailable && pane !== "versions" ? "layout" : pane === "layout" && !layoutAvailable ? "preview"
     : isFinalOnlyPane(pane) && sample && !hasFinalVersion(sample) ? "adjust" : pane;
 
   schemeTabButtons.forEach((button) => {
     const isFinalOnly = button.hasAttribute("data-final-only");
-    const isLocked = (isFinalOnly && sample && !hasFinalVersion(sample)) || (button.dataset.schemeTab === "layout" && !layoutAvailable);
+    const isPrivateOtherView = sample?.realtime && ["preview", "adjust"].includes(button.dataset.schemeTab);
+    const isLocked = isPrivateOtherView || (isFinalOnly && sample && !hasFinalVersion(sample)) || (button.dataset.schemeTab === "layout" && !layoutAvailable);
     const isActive = button.dataset.schemeTab === targetPane;
     button.hidden = isLocked;
     button.disabled = isLocked;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-selected", String(isActive));
+    if (button.dataset.schemeTab === "layout") button.textContent = sample?.realtime ? "3D 方案" : hasWalkthrough ? "实时 3D" : "3D 校对";
   });
 
   schemePanes.forEach((item) => {
     item.classList.toggle("is-active", item.dataset.schemePane === targetPane);
   });
   if (sample) {
-    detailStatus.textContent = targetPane === "layout" ? `V${version.number} · 3D 校对` : getSchemeStatus(sample);
+    detailStatus.textContent = targetPane === "layout" ? `V${version.number} · ${sample.realtime || hasWalkthrough ? "实时 3D" : "3D 校对"}` : getSchemeStatus(sample);
     detailTitle.textContent = targetPane === "layout" ? `${sample.name} · ${sample.style}`
       : `${sample.name} · ${version ? `${sample.style} ${version.title}` : sample.title}`;
   }
-  if (targetPane === "layout") renderSchemeLayout(sample, version).catch((error) => {
-    schemeLayoutHolder.textContent = error?.message || "暂时无法打开 3D 校对。";
-  });
-  else if (activeSchemeLayoutKey) closeSchemeLayout();
+  if (targetPane === "layout") {
+    const key = `${sample.id}:${version.id}`;
+    const initialMode = mode || (activeSchemeLayoutKey === key && activeSchemeLayoutMode)
+      || (sample.realtime || hasWalkthrough ? "walk" : "3d");
+    renderSchemeLayout(sample, version, initialMode, roomId).catch((error) => {
+      if (activeSchemeLayoutKey !== key || activeSchemeLayoutMode !== initialMode) return;
+      schemeLayoutHolder.textContent = error?.message || "暂时无法打开 3D 场景。";
+    });
+  } else if (activeSchemeLayoutKey) closeSchemeLayout();
+  syncVrBackgroundMusic();
 }
 
 function isFinalOnlyPane(pane) {
@@ -5523,8 +6019,19 @@ function renderSampleList() {
     cards.push(addButton);
   }
 
+  for (const project of realtimeProjects) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = project.id === activeSampleId ? "project-card is-active" : "project-card";
+    button.innerHTML = `<span class="project-thumb"><img src="./assets/showcase/new-plan-cover-cream.jpg" alt="" loading="lazy" /></span>
+      <span class="project-body"><span class="project-eyebrow">我的实时 3D 方案</span><span class="project-title-line"><strong></strong></span></span>`;
+    button.querySelector("strong").textContent = project.title;
+    button.addEventListener("click", () => openRealtimeProject(project.id).catch(showRealtimeProjectError));
+    cards.push(button);
+  }
+
   cards.push(
-    ...availableSamples.map((sample) => {
+    ...availableSamples.filter((sample) => !sample.realtime).map((sample) => {
       const room = getSampleCoverScene(sample);
       const button = document.createElement("button");
       button.type = "button";
@@ -5708,6 +6215,7 @@ function renderScheme() {
   detailArea.textContent = sample.area;
   detailStyle.textContent = sample.style;
   detailDelivery.textContent = previewVrAvailable ? "VR全景方案" : activeVersion ? (activeVersion.previewLabel || "效果图预览") : "第一版生成中";
+  renderWalkthroughLinks(sample, activeVersion, room);
   renderPreviewFloorPlan(sample, activeVersion);
 
   renderSceneTabs(detailRoomTabs, previewVrAvailable ? [] : scenes, activeRoomId, (sceneId) => {
@@ -5717,6 +6225,31 @@ function renderScheme() {
   renderAdjustPanel(sample);
   renderVersionPane(sample);
   setSchemePane(getActiveSchemePane());
+}
+
+function renderWalkthroughLinks(sample, version, room) {
+  if (!schemeWalkthroughLinks) return;
+  const walkthrough = version?.realtimeWalkthrough && version.layoutScene ? version
+    : sample.versions?.findLast((entry) => entry.realtimeWalkthrough && entry.layoutScene);
+  schemeWalkthroughLinks.hidden = !walkthrough;
+  if (!walkthrough) return;
+
+  const sameVersion = version?.id === walkthrough.id;
+  const walkthroughScenes = walkthrough.scenes || [];
+  const walkthroughRoom = walkthroughScenes.find((entry) => entry.id === room?.id || entry.name === room?.name)
+    || walkthroughScenes.find((entry) => entry.roomName === room?.roomName) || walkthroughScenes[0];
+  const targetRoom = walkthroughRoom?.roomId || walkthroughRoom?.id;
+  schemeWalkthroughLinks.querySelector("strong").textContent = sameVersion
+    ? `V${walkthrough.number} · 实时漫游` : `查看${sample.style}实时样例 · V${walkthrough.number}`;
+  for (const link of schemeWalkthroughLinks.querySelectorAll("a")) {
+    const view = link.dataset.walkthroughView;
+    link.hidden = view === "layout" && !canUseDesignerWorkspace;
+    const url = new URL(window.location.href);
+    url.search = new URLSearchParams({ project: sample.id, version: walkthrough.id, view });
+    if (targetRoom && view !== "layout") url.searchParams.set("room", targetRoom);
+    url.hash = "";
+    link.href = url.href;
+  }
 }
 
 function getActiveSample() {
@@ -5779,7 +6312,7 @@ function getActiveSchemePane() {
 }
 
 function getPreferredSchemePaneForSample(sample) {
-  return (sample?.versions || []).length > 1 ? "versions" : "preview";
+  return (sample?.versions || []).length > 1 ? "versions" : sample?.realtime ? "layout" : "preview";
 }
 
 function renderSceneTabs(container, scenes, activeId, onSelect) {
@@ -5818,6 +6351,15 @@ function getInlineVrScenes(activeVersion) {
       name: scene.name || formatVrPanoramaSceneName(scene),
       shot_type: "panorama",
     }));
+}
+
+function syncVrBackgroundMusic() {
+  if (panoramaViewer?.hidden === false) {
+    vrBackgroundMusic.setPackage(panoramaViewerMusicPackage);
+    return;
+  }
+  const inlineVrVisible = activeTab === "scheme-detail" && getActiveSchemePane() === "preview" && inlineVrPreview?.hidden === false;
+  vrBackgroundMusic.setPackage(inlineVrVisible ? getActiveVersion(getActiveSample())?.vrPackage : null);
 }
 
 function renderPreviewVr(sample, activeVersion, fallbackRoom) {
@@ -5912,25 +6454,7 @@ function switchInlineVrScene(sceneId) {
 }
 
 function loadInlineVrTexture(src) {
-  const glState = getInlineVrGlState();
-  if (!glState) {
-    return;
-  }
-  const image = new Image();
-  image.crossOrigin = "anonymous";
-  image.onload = () => {
-    const { gl, texture } = glState;
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    glState.hasTexture = true;
-    drawInlineVrFrame();
-  };
-  image.src = src;
+  loadVrTexture(getInlineVrGlState(), src, drawInlineVrFrame, inlineVrStatus);
 }
 
 function getInlineVrGlState() {
@@ -6282,6 +6806,7 @@ function ensurePanoramaViewer() {
         <button type="button" data-vr-viewer-auto>旋转</button>
         <button type="button" data-vr-viewer-reset>复位</button>
         <button type="button" data-vr-viewer-map-toggle aria-pressed="true">地图</button>
+        <button type="button" data-vr-viewer-music aria-label="背景音乐" aria-pressed="false" hidden>音乐</button>
         <button type="button" data-vr-viewer-close>退出</button>
       </nav>
       <button class="vr-viewer-scenes-toggle" type="button" data-vr-viewer-scenes-toggle aria-expanded="false">展开场景</button>
@@ -6309,6 +6834,7 @@ function ensurePanoramaViewer() {
   panoramaViewer.querySelector("[data-vr-viewer-close]")?.addEventListener("click", closePanoramaViewer);
   panoramaViewer.querySelector("[data-vr-viewer-reset]")?.addEventListener("click", resetPanoramaView);
   panoramaViewer.querySelector("[data-vr-viewer-auto]")?.addEventListener("click", togglePanoramaAutoRotate);
+  vrBackgroundMusic.attach(panoramaViewer.querySelector("[data-vr-viewer-music]"));
   panoramaViewerMapToggleButton?.addEventListener("click", togglePanoramaMap);
   panoramaViewerScenesToggleButton?.addEventListener("click", togglePanoramaSceneStrip);
   stage?.addEventListener("pointerdown", handlePanoramaPointerDown);
@@ -6362,7 +6888,9 @@ function openPanoramaViewer(vrPackageOrScenes, sceneId, renderSpec = null) {
   if (panoramaViewerMap) {
     panoramaViewerMap.hidden = false;
   }
+  panoramaViewerMusicPackage = Array.isArray(vrPackageOrScenes) ? null : vrPackageOrScenes;
   panoramaViewer.hidden = false;
+  syncVrBackgroundMusic();
   renderPanoramaViewer();
   panoramaViewer.classList.toggle("is-multi-scene", panoramaViewerScenes.length > 1);
   updatePanoramaSceneStripState();
@@ -6376,6 +6904,8 @@ function closePanoramaViewer() {
     panoramaViewerScenesExpanded = false;
     updatePanoramaSceneStripState();
   }
+  panoramaViewerMusicPackage = null;
+  syncVrBackgroundMusic();
   panoramaDragState = null;
   panoramaPhotoSphereRequestId += 1;
   destroyPhotoSphereViewer();
@@ -6678,23 +7208,49 @@ async function copyPanoramaShareLink() {
 }
 
 function loadPanoramaTexture(src) {
-  const glState = getPanoramaGlState();
-  if (!glState) {
-    return;
-  }
+  loadVrTexture(getPanoramaGlState(), src, drawPanoramaFrame, panoramaViewerStatus);
+}
+
+function loadVrTexture(glState, src, draw, status) {
+  if (!glState || !src || glState.requestedSource === src) return;
   const image = new Image();
   image.crossOrigin = "anonymous";
+  glState.requestedSource = src;
+  glState.pendingImage = image;
+  const reportFailure = () => {
+    if (glState.pendingImage !== image) return;
+    glState.requestedSource = null;
+    if (status) status.textContent = "当前全景加载失败，请重新选择该空间。";
+  };
+  image.onerror = reportFailure;
   image.onload = () => {
+    if (glState.pendingImage !== image) return;
     const { gl, texture } = glState;
+    const limit = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    let textureSource = image;
+    if (Math.max(image.naturalWidth, image.naturalHeight) > limit) {
+      const scaled = document.createElement("canvas");
+      const scale = limit / Math.max(image.naturalWidth, image.naturalHeight);
+      scaled.width = Math.round(image.naturalWidth * scale);
+      scaled.height = Math.round(image.naturalHeight * scale);
+      const context = scaled.getContext("2d");
+      if (!context) {
+        reportFailure();
+        return;
+      }
+      context.drawImage(image, 0, 0, scaled.width, scaled.height);
+      textureSource = scaled;
+    }
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureSource);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     glState.hasTexture = true;
-    drawPanoramaFrame();
+    glState.pendingImage = null;
+    draw();
   };
   image.src = src;
 }
@@ -7313,6 +7869,7 @@ function renderVersionPane(sample) {
       : `${qualityLabel}，未额外调整，${version.scenes.length} 个场景。`;
     card.append(label, title, summary);
     card.addEventListener("click", () => {
+      if (sample.realtime) { openRealtimeProject(sample.id, version.id).catch(showRealtimeProjectError); return; }
       sample.activeVersionId = version.id;
       selectedProjectVersions.set(sample.id, version.id);
       activeRoomId = version.scenes[0]?.id || activeRoomId;
