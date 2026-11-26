@@ -797,6 +797,148 @@ body.is-login-dialog-open {
   outline-offset: 3px;
 }
 
+.project-card-shell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.project-card-actions {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+}
+
+.project-more-trigger {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgb(32 40 33 / 15%);
+  cursor: pointer;
+}
+
+.project-more-trigger:hover,
+.project-more-trigger[aria-expanded="true"] {
+  background: var(--paper-2);
+  border-color: var(--studio);
+}
+
+.project-more-trigger::before {
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: -6px 0 currentColor, 6px 0 currentColor;
+  content: "";
+}
+
+.project-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 120px;
+  padding: 4px;
+  background: #fffdf8;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(32 40 33 / 14%);
+}
+
+.project-more-menu button {
+  width: 100%;
+  min-height: 40px;
+  padding-inline: 12px;
+  color: #8f4036;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.project-more-menu button:hover,
+.project-more-menu button:focus-visible {
+  background: #f8eae5;
+}
+
+.project-more-trigger:focus-visible,
+.project-more-menu button:focus-visible,
+.project-delete-dialog button:focus-visible {
+  outline: 2px solid #477465;
+  outline-offset: 2px;
+}
+
+.project-delete-dialog {
+  width: min(416px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: clamp(18px, 4vw, 24px);
+  overflow: auto;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgb(27 37 30 / 22%);
+}
+
+.project-delete-dialog::backdrop {
+  background: rgb(27 37 30 / 38%);
+}
+
+.project-delete-dialog h2 {
+  margin-bottom: 10px;
+  font-size: 20px;
+}
+
+.project-delete-dialog p {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.project-delete-dialog p + p {
+  margin-top: 8px;
+}
+
+.project-delete-target span:not([hidden]) {
+  display: block;
+  color: #58675f;
+  font-size: 13px;
+}
+
+.project-delete-dialog .project-delete-error {
+  color: #8f4036;
+}
+
+.project-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.project-delete-actions .ghost-action {
+  color: #39594b;
+}
+
+.project-delete-actions .is-danger {
+  background: #9b473c;
+}
+
+.project-delete-actions .is-danger:hover:not(:disabled) {
+  background: #84392f;
+}
+
 .style-gallery {
   display: grid;
   grid-auto-flow: dense;

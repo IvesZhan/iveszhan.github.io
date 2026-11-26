@@ -43,6 +43,11 @@ let availableSamples = [];
 let availableStyleSamples = [];
 let realtimeProjects = [];
 let realtimeLoadSequence = 0;
+let realtimeProjectDeletionSequence = 0;
+let openRealtimeActions = null;
+let realtimeDeleteTarget = null;
+let realtimeDeleteFocus = null;
+let realtimeDeleteBusy = false;
 let realtimeLoginAction = null;
 let activeRealtimeShareToken;
 let activeRealtimeShare;
@@ -51,6 +56,14 @@ let realtimeFeedbackEvents;
 const body = document.body;
 const panels = [...document.querySelectorAll("[data-panel]")];
 const sampleList = document.querySelector("#sampleList");
+const projectDeleteDialog = document.querySelector("[data-project-delete-dialog]");
+const projectDeleteForm = document.querySelector("[data-project-delete-form]");
+const projectDeleteName = document.querySelector("[data-project-delete-name]");
+const projectDeleteCreated = document.querySelector("[data-project-delete-created]");
+const projectDeleteError = document.querySelector("[data-project-delete-error]");
+const projectDeleteCancel = document.querySelector("[data-project-delete-cancel]");
+const projectDeleteConfirm = document.querySelector("[data-project-delete-confirm]");
+const projectDeleteNotice = document.querySelector("[data-project-delete-notice]");
 const styleList = document.querySelector("#styleList");
 const styleCountLabel = document.querySelector("[data-style-count]");
 const stylePanoCountLabel = document.querySelector("[data-style-pano-count]");
@@ -580,6 +593,7 @@ applyRole();
 applyAuthState();
 configureLocalPreview();
 bindNavigation();
+bindRealtimeProjectDeletion();
 bindStyleLibraryTools();
 bindImportWorkflow();
 renderSampleList();
@@ -4040,13 +4054,147 @@ async function realtimeApi(path, options) {
 
 async function loadRealtimeProjects() {
   if (!canUseDesignerWorkspace || !sessionStorage.getItem(REALTIME_SESSION_KEY)) return;
+  const deletionSequence = realtimeProjectDeletionSequence;
   try {
     const { projects } = await realtimeApi("/realtime-projects");
+    if (deletionSequence !== realtimeProjectDeletionSequence) return;
     realtimeProjects = projects;
     renderSampleList();
   } catch (error) {
     if (error.status !== 401 && error.name !== "AbortError") console.warn("实时方案列表加载失败。", error.message);
   }
+}
+
+function closeRealtimeProjectMenu(restoreFocus = false) {
+  if (!openRealtimeActions) return;
+  const { trigger, menu } = openRealtimeActions;
+  trigger.setAttribute("aria-expanded", "false");
+  menu.hidden = true;
+  openRealtimeActions = null;
+  if (restoreFocus) trigger.focus();
+}
+
+function showRealtimeDeleteError(message = "") {
+  projectDeleteError.textContent = message;
+  projectDeleteError.hidden = !message;
+}
+
+function setRealtimeDeleteBusy(busy) {
+  realtimeDeleteBusy = busy;
+  projectDeleteForm.setAttribute("aria-busy", String(busy));
+  projectDeleteCancel.disabled = busy;
+  projectDeleteConfirm.disabled = busy;
+  projectDeleteConfirm.textContent = busy ? "正在删除…" : "删除户型";
+}
+
+function openRealtimeProjectDelete(project, trigger) {
+  if (projectDeleteDialog.open) return;
+  closeRealtimeProjectMenu();
+  realtimeDeleteTarget = project;
+  realtimeDeleteFocus = trigger;
+  projectDeleteName.textContent = project.title;
+  const created = new Date(project.createdAt);
+  const validDate = Boolean(project.createdAt) && Number.isFinite(created.getTime());
+  projectDeleteCreated.hidden = !validDate;
+  projectDeleteCreated.textContent = validDate ? `创建于 ${created.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "medium" })}` : "";
+  setRealtimeDeleteBusy(false);
+  showRealtimeDeleteError();
+  projectDeleteNotice.hidden = true;
+  projectDeleteDialog.showModal();
+  projectDeleteCancel.focus();
+}
+
+function removeRealtimeProjectFromView(projectId) {
+  realtimeProjectDeletionSequence += 1;
+  realtimeLoadSequence += 1;
+  const index = realtimeProjects.findIndex(({ id }) => id === projectId);
+  realtimeProjects = realtimeProjects.filter(({ id }) => id !== projectId);
+  availableSamples = availableSamples.filter(({ id }) => id !== projectId);
+  selectedProjectVersions.delete(projectId);
+  for (const key of schemeLayoutDrafts.keys()) {
+    if (key.startsWith(`${projectId}:`)) schemeLayoutDrafts.delete(key);
+  }
+  for (const [storageName, prefix] of [["sessionStorage", "xspace:studio-draft"], ["localStorage", "xspace:layout"]]) {
+    try {
+      const storage = window[storageName];
+      for (let position = storage.length - 1; position >= 0; position -= 1) {
+        const key = storage.key(position);
+        if (key?.startsWith(`${prefix}:${projectId}:`)) storage.removeItem(key);
+      }
+    } catch { /* Browser storage is optional. */ }
+  }
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("project") === projectId) {
+    for (const parameter of ["project", "version", "view", "room"]) url.searchParams.delete(parameter);
+    window.history.replaceState(null, "", url);
+  }
+  if (activeSampleId === projectId) {
+    activeSampleId = "";
+    activeRoomId = "";
+    activeAdjustSceneId = "";
+    setTab("samples");
+  }
+  renderSampleList();
+  const cards = sampleList.querySelectorAll(".project-card-shell > .project-card");
+  return cards[index] || cards[index - 1] || sampleList.querySelector(".add-project-card") || sampleList;
+}
+
+async function confirmRealtimeProjectDelete(event) {
+  event.preventDefault();
+  if (!realtimeDeleteTarget || realtimeDeleteBusy) return;
+  const project = realtimeDeleteTarget;
+  if (!sessionStorage.getItem(REALTIME_SESSION_KEY)) {
+    projectDeleteDialog.close();
+    requireRealtimeLogin(() => {
+      const current = realtimeProjects.find(({ id }) => id === project.id);
+      const trigger = sampleList.querySelector(`[data-project-id="${CSS.escape(project.id)}"] .project-more-trigger`);
+      if (current && trigger) openRealtimeProjectDelete(current, trigger);
+      else showRealtimeProjectError(new Error("此账号下已找不到这个户型。"));
+    });
+    return;
+  }
+
+  showRealtimeDeleteError();
+  setRealtimeDeleteBusy(true);
+  try {
+    await realtimeApi(`/realtime-projects/${encodeURIComponent(project.id)}`, { method: "DELETE" }).catch((error) => {
+      if (error.status !== 404) throw error;
+    });
+    realtimeDeleteFocus = removeRealtimeProjectFromView(project.id);
+    projectDeleteNotice.textContent = `已移除「${project.title}」。`;
+    projectDeleteNotice.hidden = false;
+    projectDeleteDialog.close();
+  } catch (error) {
+    showRealtimeDeleteError(error.status === 401 ? "登录已过期。可以登录后重试删除。" : formatRealtimeError(error));
+  } finally {
+    setRealtimeDeleteBusy(false);
+    if (projectDeleteDialog.open) projectDeleteCancel.focus();
+  }
+}
+
+function bindRealtimeProjectDeletion() {
+  projectDeleteForm.addEventListener("submit", confirmRealtimeProjectDelete);
+  projectDeleteCancel.addEventListener("click", () => projectDeleteDialog.close());
+  projectDeleteDialog.addEventListener("cancel", (event) => {
+    if (realtimeDeleteBusy) event.preventDefault();
+  });
+  projectDeleteDialog.addEventListener("close", () => {
+    if (projectDeleteDialog.open) return;
+    const target = realtimeDeleteFocus?.isConnected ? realtimeDeleteFocus : sampleList.querySelector(".add-project-card") || sampleList;
+    realtimeDeleteTarget = null;
+    realtimeDeleteFocus = null;
+    if (loginDialog.hidden) target.focus();
+  });
+  document.addEventListener("click", (event) => {
+    if (openRealtimeActions && !openRealtimeActions.group.contains(event.target)) closeRealtimeProjectMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && openRealtimeActions) {
+      event.preventDefault();
+      closeRealtimeProjectMenu(true);
+    }
+  });
 }
 
 function openRequestedRealtimeProject() {
@@ -4082,13 +4230,18 @@ function showRealtimeProjectError(error) {
 async function openRealtimeProject(projectId, versionId = null) {
   const attempt = ++realtimeLoadSequence;
   const path = `/realtime-projects/${projectId}`;
-  const record = await realtimeApi(path);
-  if (attempt !== realtimeLoadSequence) return;
-  if (versionId && record.version.id !== versionId) {
-    record.version = (await realtimeApi(`${path}/versions/${versionId}`)).version;
+  try {
+    const record = await realtimeApi(path);
+    if (attempt !== realtimeLoadSequence) return;
+    if (versionId && record.version.id !== versionId) {
+      record.version = (await realtimeApi(`${path}/versions/${versionId}`)).version;
+    }
+    if (attempt !== realtimeLoadSequence || !sessionStorage.getItem(REALTIME_SESSION_KEY)) return;
+    showRealtimeProject(record);
+  } catch (error) {
+    if (attempt !== realtimeLoadSequence && error.status !== 401) return;
+    throw error;
   }
-  if (attempt !== realtimeLoadSequence || !sessionStorage.getItem(REALTIME_SESSION_KEY)) return;
-  showRealtimeProject(record);
 }
 
 function showRealtimeProject({ project, version, versions = [version] }) {
@@ -5581,6 +5734,7 @@ function isDesignerTab(tab) {
 }
 
 function renderSampleList() {
+  closeRealtimeProjectMenu();
   const cards = [];
 
   if (showCreateCardInCaseLibrary && canUseDesignerWorkspace) {
@@ -5608,6 +5762,9 @@ function renderSampleList() {
   }
 
   for (const project of realtimeProjects) {
+    const shell = document.createElement("div");
+    shell.className = "project-card-shell";
+    shell.dataset.projectId = project.id;
     const button = document.createElement("button");
     button.type = "button";
     button.className = project.id === activeSampleId ? "project-card is-active" : "project-card";
@@ -5615,7 +5772,37 @@ function renderSampleList() {
       <span class="project-body"><span class="project-eyebrow">我的实时 3D 方案</span><span class="project-title-line"><strong></strong></span></span>`;
     button.querySelector("strong").textContent = project.title;
     button.addEventListener("click", () => openRealtimeProject(project.id).catch(showRealtimeProjectError));
-    cards.push(button);
+
+    const group = document.createElement("div");
+    group.className = "project-card-actions";
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "project-more-trigger";
+    trigger.title = "更多操作";
+    trigger.setAttribute("aria-label", `更多操作 · ${project.title}`);
+    trigger.setAttribute("aria-expanded", "false");
+    const menu = document.createElement("div");
+    menu.className = "project-more-menu";
+    menu.id = `project-actions-${project.id}`;
+    menu.hidden = true;
+    trigger.setAttribute("aria-controls", menu.id);
+    trigger.addEventListener("click", () => {
+      const wasOpen = openRealtimeActions?.trigger === trigger;
+      closeRealtimeProjectMenu();
+      if (wasOpen) return;
+      menu.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      openRealtimeActions = { group, trigger, menu };
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "删除户型";
+    remove.addEventListener("click", () => openRealtimeProjectDelete(project, trigger));
+    menu.append(remove);
+    group.append(trigger, menu);
+    shell.append(button, group);
+    cards.push(shell);
   }
 
   if (!cards.length) {
