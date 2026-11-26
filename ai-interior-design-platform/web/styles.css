@@ -806,8 +806,8 @@ body.is-login-dialog-open {
 .project-card-actions {
   position: absolute;
   z-index: 2;
-  top: 12px;
-  right: 12px;
+  top: 4px;
+  right: 4px;
 }
 
 .project-more-trigger {
@@ -816,33 +816,52 @@ body.is-login-dialog-open {
   height: 44px;
   padding: 0;
   place-items: center;
-  color: var(--ink);
-  background: #fffdf8;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  box-shadow: 0 2px 10px rgb(32 40 33 / 15%);
+  color: #fffdf8;
+  background: transparent;
+  border: 0;
   cursor: pointer;
 }
 
-.project-more-trigger:hover,
-.project-more-trigger[aria-expanded="true"] {
-  background: var(--paper-2);
-  border-color: var(--studio);
+.project-more-trigger::before,
+.project-more-trigger::after {
+  grid-area: 1 / 1;
+  content: "";
 }
 
 .project-more-trigger::before {
-  width: 4px;
-  height: 4px;
+  width: 28px;
+  height: 24px;
+  background: rgb(40 37 31 / 64%);
+  border-radius: 6px;
+}
+
+.project-more-trigger:hover::before,
+.project-more-trigger[aria-expanded="true"]::before {
+  background: rgb(40 37 31 / 84%);
+}
+
+.project-more-trigger::after {
+  width: 3px;
+  height: 3px;
   background: currentColor;
   border-radius: 50%;
-  box-shadow: -6px 0 currentColor, 6px 0 currentColor;
-  content: "";
+  box-shadow: -5px 0 currentColor, 5px 0 currentColor;
+}
+
+.project-more-trigger:focus-visible {
+  outline: 0;
+}
+
+.project-more-trigger:focus-visible::before {
+  outline: 2px solid #fffdf8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgb(40 37 31 / 78%);
 }
 
 .project-more-menu {
   position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
+  right: 8px;
+  top: calc(100% - 4px);
   min-width: 120px;
   padding: 4px;
   background: #fffdf8;
@@ -871,7 +890,6 @@ body.is-login-dialog-open {
   background: #f8eae5;
 }
 
-.project-more-trigger:focus-visible,
 .project-more-menu button:focus-visible,
 .project-delete-dialog button:focus-visible {
   outline: 2px solid #477465;
