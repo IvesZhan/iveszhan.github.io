@@ -1,4 +1,5 @@
 export const LAYOUT_SCHEMA = "layout-review/v1";
+const editorMaterials = new Set(["wood", "walnut", "tile800", "tile600", "marble", "antislip", "terrazzo", "carpet"]);
 
 function list(value, field, limit) {
   if (!Array.isArray(value) || value.length > limit) throw new Error(`户型${field}数据无效或数量过多。`);
@@ -13,6 +14,21 @@ function number(value, minimum, maximum) {
 function point(value) {
   if (!Array.isArray(value) || value.length !== 2) throw new Error("户型点位格式无效。");
   return value.map((axis) => number(axis, -500, 500));
+}
+
+function cameraPoint(value) {
+  if (!Array.isArray(value) || value.length !== 3) throw new Error("全景机位坐标格式无效。");
+  return [number(value[0], -500, 500), number(value[1], 0, 12), number(value[2], -500, 500)];
+}
+
+function cameraFrame(viewpoint, room) {
+  const positionM = cameraPoint(viewpoint.positionM);
+  const targetM = cameraPoint(viewpoint.targetM);
+  if (!room || positionM[1] < 0.3 || !containsPoint([positionM[0], positionM[2]], room.polygon) ||
+      Math.hypot(targetM[0] - positionM[0], targetM[2] - positionM[2]) < 0.01) {
+    throw new Error("全景机位需要位于关联空间内，并设置可用的视线方向。");
+  }
+  return { positionM, targetM };
 }
 
 function id(value) {
@@ -38,7 +54,10 @@ export function loadLayoutScene(scene) {
   const rooms = unique(list(scene.rooms, "房间", 100).map((room) => {
     const polygon = list(room.polygon, "房间轮廓", 200).map(point);
     if (polygon.length < 3 || Math.abs(polygonArea(polygon)) < 0.01) throw new Error("户型有无法使用的房间轮廓。");
-    return { id: id(room.id), name: label(room.name, "未命名空间"), polygon, excludeFromRoutes: room.excludeFromRoutes === true };
+    return {
+      id: id(room.id), name: label(room.name, "未命名空间"), polygon, excludeFromRoutes: room.excludeFromRoutes === true,
+      ...(editorMaterials.has(room.editorMaterial) ? { editorMaterial: room.editorMaterial } : {}),
+    };
   }));
   const walls = unique(list(scene.walls, "墙体", 700).map((wall) => ({
     id: id(wall.id), name: label(wall.name, "墙体"), start: point(wall.start), end: point(wall.end),
@@ -75,12 +94,26 @@ export function loadLayoutScene(scene) {
     heightM: number(item.heightM, 0.01, 12), bottomM: number(item.bottomM ?? 0, -0.5, 12),
     rotationRad: number(item.rotationRad ?? 0, -Math.PI * 8, Math.PI * 8),
     ...(["round", "rectangular"].includes(item.shape) ? { shape: item.shape } : {}),
+    ...(typeof item.editorType === "string" && /^[a-z][a-z0-9_-]{0,32}$/.test(item.editorType) ? { editorType: item.editorType } : {}),
+    ...(typeof item.editorColor === "string" && /^#[a-f0-9]{6}$/i.test(item.editorColor) ? { editorColor: item.editorColor } : {}),
+    ...(Number.isFinite(item.editorRotationDeg) && Math.abs(item.editorRotationDeg) <= 1440 ? { editorRotationDeg: item.editorRotationDeg } : {}),
   })));
   const entranceId = openings.some((opening) => opening.id === scene.entranceId && opening.kind !== "window") ? scene.entranceId : null;
+  const walkableRooms = new Map(rooms.filter((room) => !room.excludeFromRoutes).map((room) => [room.id, room]));
+  const viewpoints = unique(list(scene.viewpoints ?? [], "全景机位", 100).map((viewpoint) => {
+    const room = walkableRooms.get(viewpoint.roomId);
+    const frame = cameraFrame(viewpoint, room);
+    const result = { id: id(viewpoint.id), name: label(viewpoint.name, room.name), roomId: room.id, ...frame };
+    if (viewpoint.walkView) {
+      result.walkView = { ...cameraFrame(viewpoint.walkView, room), verticalFovDeg: number(viewpoint.walkView.verticalFovDeg, 40, 75) };
+    }
+    return result;
+  }));
   const bounds = getLayoutBounds({ rooms, walls });
   if (bounds.maxX - bounds.minX > 80 || bounds.maxZ - bounds.minZ > 80) throw new Error("请导入单层住宅户型，当前图纸范围过大。");
   return {
     schema: LAYOUT_SCHEMA, name: label(scene.name, "户型校对"), rooms, walls, openings, items, entranceId,
+    ...(viewpoints.length ? { viewpoints } : {}),
     warnings: list(scene.warnings || [], "提示", 250).map((message) => label(message, "需要核对图纸数据")),
   };
 }

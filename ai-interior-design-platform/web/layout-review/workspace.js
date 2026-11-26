@@ -1,4 +1,4 @@
-import { containsPoint, loadLayoutScene } from "./scene.js";
+import { containsPoint, loadLayoutScene } from "./scene.js?v=studio-version-save";
 import { createVrBackgroundMusic } from "../vr-background-music.js";
 
 const presets = {
@@ -48,7 +48,7 @@ export function readLayoutDraft(key) {
 
 export function createLayoutWorkspace(holder, {
   source, key, draft, onSceneChange, readOnly = false, initialMode = "3d", initialRoomId = "", music, panoramaCaptureLabel = null,
-  onSaveVersion, saveVersionLabel = "保存新版本", allowSaveUnchanged = false,
+  onSaveVersion, saveVersionLabel = "保存新版本", allowSaveUnchanged = false, allowLocalDraft = true,
   onShareVersion, shareVersionLabel = "分享漫游", onSelectItem, onWalkRoom, onViewModeChange, styleId, visualProfile,
 } = {}) {
   const root = el("section", readOnly ? "layout-workbench layout-workbench--read-only" : "layout-workbench");
@@ -125,6 +125,7 @@ export function createLayoutWorkspace(holder, {
   let savedSignature = "";
   let versionAction = "";
   let panoramaCaptureBusy = false;
+  let guiding = false;
   const unselect = () => { selectedItemId = null; updateInspector(); viewer?.highlight(null); };
   const visibleModel = () => compareOriginal ? original : model;
 
@@ -146,6 +147,15 @@ export function createLayoutWorkspace(holder, {
   });
   const resetView = clickButton(readOnly ? "复位" : "复位视角", () => viewer?.focusRoom(isInteriorView(mode) ? walkingRoomId : roomId));
   if (readOnly) resetView.title = "复位当前视角";
+  const guide = clickButton("导览", () => {
+    if (guiding) viewer?.stopGuide();
+    else viewer?.startGuide();
+  });
+  guide.hidden = true;
+  guide.disabled = true;
+  guide.title = "沿实际室内动线查看各房间全景机位";
+  guide.setAttribute("aria-label", "动线导览");
+  guide.setAttribute("aria-pressed", "false");
   const compare = clickButton("对比原布局", () => {
     compareOriginal = !compareOriginal;
     compare.textContent = compareOriginal ? "返回校对草稿" : "对比原布局";
@@ -209,7 +219,7 @@ export function createLayoutWorkspace(holder, {
   const allFilter = clickButton("全部", () => setReportScope("all"));
   reportFilter.append(attentionFilter, allFilter);
   setReportScope("attention");
-  secondaryTools.append(resetView, musicButton);
+  secondaryTools.append(guide, resetView, musicButton);
   if (panoramaExport) secondaryTools.append(panoramaExport);
   secondaryTools.append(fullscreen);
   stage.append(stageStatus, walkControls, walkNotice);
@@ -245,7 +255,8 @@ export function createLayoutWorkspace(holder, {
   sideHeader.append(heading, status, reportFilter);
   sideBody.append(report, warnings, entrySettings);
   editor.append(el("h3", null, "家具校对"), addPicker, inspector);
-  actions.append(run, exportButton, save);
+  actions.append(run, exportButton);
+  if (allowLocalDraft) actions.append(save);
   if (saveVersion) actions.append(saveVersion);
   if (shareVersion) actions.append(shareVersion);
   if (saveVersion || shareVersion) actions.append(versionStatus);
@@ -413,6 +424,7 @@ export function createLayoutWorkspace(holder, {
     modePlan.setAttribute("aria-pressed", String(mode === "plan"));
     modeWalk.setAttribute("aria-pressed", String(walking));
     modePanorama.setAttribute("aria-pressed", String(mode === "panorama"));
+    guide.hidden = !walking || (model?.viewpoints?.length ?? 0) < 2;
     updatePanoramaExport();
     root.classList.toggle("is-interior", inside);
     walkControls.hidden = !walking;
@@ -545,7 +557,7 @@ export function createLayoutWorkspace(holder, {
   }
 
   function saveDraft() {
-    if (!model || !key || compareOriginal) return;
+    if (!allowLocalDraft || !model || !key || compareOriginal) return;
     try {
       localStorage.setItem(`xspace:layout:${key}`, JSON.stringify(loadLayoutScene(model)));
       status.textContent = "校对草稿已保存到此浏览器。";
@@ -718,7 +730,8 @@ export function createLayoutWorkspace(holder, {
       }
       if (!alive) return;
       original = loadLayoutScene(data);
-      model = readOnly ? original : (draft ? loadLayoutScene(draft) : key && readLayoutDraft(key)) || structuredClone(original);
+      const localDraft = allowLocalDraft && !readOnly && !draft && key ? readLayoutDraft(key) : null;
+      model = readOnly ? original : draft ? loadLayoutScene(draft) : localDraft || structuredClone(original);
       roomPicker.append(allRoomsOption, ...model.rooms.map((room) => new Option(room.name, room.id)));
       populateTourRooms();
       if (!readOnly) {
@@ -742,7 +755,7 @@ export function createLayoutWorkspace(holder, {
         scheduleCheck(0);
       }
       try {
-        const { createLayoutViewer } = await import("./viewer.js?v=cream-v6-3");
+        const { createLayoutViewer } = await import("./viewer.js?v=studio-version-save");
         if (!alive) return;
         viewer = createLayoutViewer(stage, {
           styleId,
@@ -751,6 +764,12 @@ export function createLayoutWorkspace(holder, {
           onMeasure: (value) => { hint.textContent = value == null ? "选择第二个测量点。" : `距离 ${millimeters(value)}`; },
           onWalkRoom: handleWalkRoom,
           onWalkNotice: (message) => { if (alive && isInteriorView(mode)) walkNotice.textContent = message || ""; },
+          onGuideChange: (active) => {
+            guiding = active;
+            guide.textContent = active ? "停止" : "导览";
+            guide.title = active ? "停止动线导览" : "沿实际室内动线查看各房间全景机位";
+            guide.setAttribute("aria-pressed", String(active));
+          },
         });
         viewer.update(model, { reset: true });
         const view = ["3d", "plan", "walk", "panorama"].includes(initialMode) ? initialMode : "3d";
@@ -773,7 +792,7 @@ export function createLayoutWorkspace(holder, {
           focusWalkCanvas();
         }
         stageStatus.hidden = true;
-        for (const node of [mode3d, modePlan, modeWalk, modePanorama, measure, resetView, roomPicker, fullscreen]) node.disabled = false;
+        for (const node of [mode3d, modePlan, modeWalk, modePanorama, measure, resetView, roomPicker, fullscreen, guide]) node.disabled = false;
         for (const button of tourRoomButtons.values()) button.disabled = false;
       } catch {
         stageStatus.textContent = readOnly ? "当前浏览器无法显示 3D 漫游。" : "当前浏览器无法显示 3D。你仍可在右侧查看空间检查结果。";

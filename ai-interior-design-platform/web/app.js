@@ -1,8 +1,8 @@
-import { APP_CONFIG } from "./config.js?v=retire-legacy-plans";
-import { loadLayoutScene, toFloorPlan } from "./layout-review/scene.js";
+import { APP_CONFIG } from "./config.js?v=studio-version-save";
+import { loadLayoutScene, toFloorPlan } from "./layout-review/scene.js?v=studio-version-save";
 import { createVrBackgroundMusic } from "./vr-background-music.js";
-import { makeRealtimeShareUrl, readRealtimeShare, realtimeMusic, REALTIME_SESSION_KEY, requestRealtime } from "./realtime-projects.js";
-import { createRealtimeDesignSummary } from "./realtime-design-summary.js";
+import { makeRealtimeStudioUrl, readRealtimeShare, realtimeMusic, REALTIME_SESSION_KEY, requestRealtime } from "./realtime-projects.js?v=studio-version-save";
+import { createRealtimeDesignSummary } from "./realtime-design-summary.js?v=studio-version-save";
 
 const vrPreviewSamples = 8;
 const vrPreviewPanoramaWidth = 4096;
@@ -59,6 +59,9 @@ const styleFilters = document.querySelector("[data-style-filters]");
 const detailStatus = document.querySelector("#detailStatus");
 const detailTitle = document.querySelector("#detailTitle");
 const detailImage = document.querySelector("#detailImage");
+const realtimePreviewImage = document.querySelector("[data-realtime-preview-image]");
+const realtimeEditorEntry = document.querySelector("[data-realtime-editor-entry]");
+const realtimeEditorLink = document.querySelector("[data-open-realtime-editor]");
 const detailRoomName = document.querySelector("#detailRoomName");
 const detailSummary = document.querySelector("#detailSummary");
 const previewFloorPlan = document.querySelector("[data-preview-floor-plan]");
@@ -404,6 +407,10 @@ const effectBriefStyleSignals = {
 };
 const lidarFloorExtensions = [".json", ".roomplan"];
 const acceptedFloorExtensions = [".dxf", ".dwg", ...lidarFloorExtensions];
+const rasterFloorTypes = new Map([
+  [".png", "image/png"], [".jpg", "image/jpeg"], [".jpeg", "image/jpeg"], [".webp", "image/webp"],
+]);
+const maxRasterFloorBytes = 8 * 1024 * 1024;
 const requiredFloorLayerRules = [
   {
     key: "wall",
@@ -494,12 +501,15 @@ let styleSearchQuery = "";
 let floorValidationState = { status: "empty", title: "", messages: [] };
 let floorValidationRunId = 0;
 let selectedFloorFile = null;
+let rasterFloorRequest = null;
+let floorPreviewObjectUrl = null;
 let importedLayout = null;
 let importedLayoutDraft = null;
 let activeImportLayout = null;
 let activeSchemeLayout = null;
 let activeSchemeLayoutKey = "";
 let activeSchemeLayoutMode = "";
+let activeRealtimePreview = null;
 const schemeLayoutDrafts = new Map();
 let layoutLoadSequence = 0;
 const importLayoutButton = document.querySelector("[data-open-import-layout]");
@@ -516,7 +526,7 @@ let currentRenderJobId = "";
 let isStoppingRender = false;
 let generationStatusProgressTimer = null;
 let renderStatusProgressTimer = null;
-const generateButtonDefaultText = generateButton?.textContent.trim() || "生成空间方案";
+const generateButtonDefaultText = "生成 3D 首版";
 const adjustmentLabels = {
   storage: "收纳加强",
   "warmer-light": "灯光更暖",
@@ -1234,9 +1244,7 @@ function bindImportWorkflow() {
     importLayoutHolder.textContent = error?.message || "暂时无法打开 3D 校对。";
   }));
   generateButton?.addEventListener("click", handleGeneratePlan);
-  const output = document.querySelector("[data-generation-output]");
-  if (output && APP_CONFIG.api?.realtimeBaseUrl) output.textContent = "按户型和需求生成可编辑的实时 3D 方案。";
-  renderFinalButton?.addEventListener("click", handleRenderFinalVersion);
+  selectStylePackage("cream");
   clearAdjustmentsButton?.addEventListener("click", clearCurrentAdjustments);
 }
 
@@ -1251,7 +1259,7 @@ function selectStylePackage(styleId) {
   });
 
   syncDesignIdeaForSelectedStyle();
-  clearGenerationStatus();
+  if (!isGeneratingPlan) clearGenerationStatus();
   updateGenerateState();
 }
 
@@ -1260,21 +1268,9 @@ function syncDesignIdeaForSelectedStyle() {
     return;
   }
 
-  if (APP_CONFIG.api?.realtimeBaseUrl) {
-    if (!designIdeaInput.value.trim() && effectBriefDocument?.content) {
-      designIdeaInput.value = normalizeEffectBriefText(effectBriefDocument.content);
-    }
-    return;
+  if (!designIdeaInput.value.trim() && effectBriefDocument?.content) {
+    designIdeaInput.value = normalizeEffectBriefText(effectBriefDocument.content);
   }
-  designIdeaInput.value = getDesignIdeaForStyle(selectedStyleId);
-}
-
-function getDesignIdeaForStyle(styleId) {
-  if (shouldUseEffectBriefAsDesignIdea(styleId)) {
-    return normalizeEffectBriefText(effectBriefDocument.content);
-  }
-
-  return stylePackages[styleId]?.defaultIdea || "";
 }
 
 function shouldUseEffectBriefAsDesignIdea(styleId) {
@@ -1297,7 +1293,8 @@ async function handleGeneratePlan() {
     return;
   }
 
-  const stylePackage = stylePackages[selectedStyleId];
+  const styleId = selectedStyleId;
+  const stylePackage = stylePackages[styleId];
   const floorFile = selectedFloorFile || importStepInputs.find((input) => input.dataset.importStep === "floor")?.files?.[0];
   if (!stylePackage || !floorFile) {
     setGenerationStatus({
@@ -1308,8 +1305,9 @@ async function handleGeneratePlan() {
     return;
   }
 
-  const realtimeGeneration = Boolean(APP_CONFIG.api?.realtimeBaseUrl);
-  if (realtimeGeneration && !requireRealtimeLogin(handleGeneratePlan)) return;
+  if (!requireRealtimeLogin(handleGeneratePlan)) return;
+  const initialSource = importedLayout && (importedLayoutDraft || importedLayout.scene);
+  const brief = String(designIdeaInput?.value || "").trim().slice(0, 3000);
 
   isGeneratingPlan = true;
   generateButton.textContent = "生成中";
@@ -1317,74 +1315,40 @@ async function handleGeneratePlan() {
     status: "running",
     title: "正在生成第一版方案",
     messages: [effectBriefDocument ? "解析户型图和效果说明" : "解析户型图", `套用${stylePackage.label}风格规则`,
-      realtimeGeneration ? "生成实时 3D 场景并保存 V1" : "生成整屋设计状态和各区域全景任务"],
+      "生成实时 3D 场景并保存 V1"],
   });
   updateGenerateState();
 
   try {
-    if (realtimeGeneration) {
-      const [{ fromFloorPlan }, { planRealtimeDesign }] = await Promise.all([
-        import("./layout-review/realtime-scene.js"), import("./layout-review/design-plan.js"),
-      ]);
-      let source = importedLayout && (importedLayoutDraft || importedLayout.scene);
-      if (!source) {
-        const name = floorFile.name.replace(/\.[^.]+$/, "");
-        let parsedFloor;
-        if (getFileExtension(floorFile.name) === ".dxf") {
-          try { parsedFloor = buildStandardDxfLayout(inspectDxfContent(await floorFile.text())); }
-          catch (error) {
-            const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage).catch(() => { throw error; });
-            validateDraftAgainstEffectBrief(draft);
-            parsedFloor = draft.floor_plan;
-          }
-        } else {
-          const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage);
+    const [{ fromFloorPlan }, { planRealtimeDesign }] = await Promise.all([
+      import("./layout-review/realtime-scene.js?v=studio-version-save"), import("./layout-review/design-plan.js?v=studio-version-save"),
+    ]);
+    let source = initialSource;
+    if (!source) {
+      const name = floorFile.name.replace(/\.[^.]+$/, "");
+      let parsedFloor;
+      if (getFileExtension(floorFile.name) === ".dxf") {
+        try { parsedFloor = buildStandardDxfLayout(inspectDxfContent(await floorFile.text())); }
+        catch (error) {
+          const draft = await createProjectDraftFromBackend(floorFile, styleId, stylePackage).catch(() => { throw error; });
           validateDraftAgainstEffectBrief(draft);
           parsedFloor = draft.floor_plan;
         }
-        source = fromFloorPlan(parsedFloor, { name });
+      } else {
+        const draft = await createProjectDraftFromBackend(floorFile, styleId, stylePackage);
+        validateDraftAgainstEffectBrief(draft);
+        parsedFloor = draft.floor_plan;
       }
-      const brief = String(designIdeaInput?.value || "").trim().slice(0, 3000);
-      const { layout, design } = planRealtimeDesign(source, brief);
-      const { project } = await createRealtimeProject(layout, { styleId: selectedStyleId, brief, design });
-      setGenerationStatus({ status: "complete", title: "已生成实时 3D 方案", messages: [`${project.title} · V1`] });
-      return;
+      source = fromFloorPlan(parsedFloor, { name });
     }
-    const draft = await createProjectDraftFromBackend(floorFile, selectedStyleId, stylePackage);
-    validateDraftAgainstEffectBrief(draft);
-    const generatedStylePackage = stylePackages[draft?.design_plan?.style] || stylePackage;
-    const sample = buildGeneratedSampleFromDraft(draft, generatedStylePackage, floorFile);
-    setGenerationStatus({
-      status: "running",
-      title: "正在生成第一版 VR 全景",
-      messages: ["读取各区域真实全景任务", "生成 2:1 全景图", "组合第一版 VR package"],
-    });
-    const panoramaResult = await renderRealPanoramaVersionWithBackend(sample, setInitialPanoramaJobProgressStatus);
-    const version = buildFinalVersion(sample, panoramaResult);
-    applyVersionToSample(sample, version, panoramaResult);
-    await persistProjectVersion(sample, version, panoramaResult);
-    availableSamples = [
-      sample,
-      ...availableSamples.filter((item) => item.id !== sample.id),
-    ];
-    activeSampleId = sample.id;
-    activeRoomId = sample.rooms[0].id;
-    activeAdjustSceneId = sample.plannedScenes[0]?.id || "";
-
-    renderSampleList();
-    renderScheme();
-    setGenerationStatus({
-      status: "complete",
-      title: "已生成第一版方案",
-      messages: [`${sample.name} · ${version.title}`, "已同步到方案库，所有用户都可以查看。"],
-    });
-    setSchemePane("preview");
-    setTab("scheme-detail");
+    const { layout, design } = planRealtimeDesign(source, brief);
+    const { project } = await createRealtimeProject(layout, { styleId, brief, design });
+    setGenerationStatus({ status: "complete", title: "已生成 3D 首版", messages: [`${project.title} · V1`] });
   } catch (error) {
     setGenerationStatus({
       status: "error",
       title: "方案生成失败",
-      messages: [formatGenerationError(error)],
+      messages: [formatRealtimeError(error)],
     });
   } finally {
     isGeneratingPlan = false;
@@ -3441,12 +3405,13 @@ function clearImportedLayout() {
 async function openImportedLayout() {
   const current = importedLayout;
   if (!current) return;
-  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=cream-v6-3");
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=studio-version-save");
   if (current !== importedLayout) return;
   importLayoutHolder.hidden = false;
   if (!activeImportLayout) {
-    activeImportLayout = createLayoutWorkspace(importLayoutHolder, { source: current.scene, key: current.key,
-      onSceneChange(scene) { if (current === importedLayout) importedLayoutDraft = scene; } });
+    activeImportLayout = createLayoutWorkspace(importLayoutHolder, {
+      source: importedLayoutDraft || current.scene, readOnly: true,
+    });
   }
   importLayoutHolder.scrollIntoView({ block: "nearest" });
 }
@@ -3463,7 +3428,7 @@ async function importLidarFloor(file, runId) {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
     const key = `import:${Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("")}`;
     if (runId !== floorValidationRunId) return;
-    const { readLayoutDraft } = await import("./layout-review/workspace.js?v=cream-v6-3");
+    const { readLayoutDraft } = await import("./layout-review/workspace.js?v=studio-version-save");
     if (runId !== floorValidationRunId) return;
     importedLayout = { scene, key };
     importedLayoutDraft = readLayoutDraft(key) || scene;
@@ -3484,6 +3449,47 @@ async function importLidarFloor(file, runId) {
   updateGenerateState();
 }
 
+async function importRasterFloor(file, contentType, runId, input) {
+  if (runId !== floorValidationRunId) return;
+  if (!requireRealtimeLogin(() => importRasterFloor(file, contentType, runId, input))) {
+    setFloorValidation({ status: "invalid", title: "请登录后识别户型", messages: ["若关闭登录窗口，可登录后重新选择图片。"] });
+    updateGenerateState();
+    input.value = "";
+    return;
+  }
+  const request = new AbortController();
+  rasterFloorRequest = request;
+  setFloorValidation({ status: "checking", title: "正在识别图片户型", messages: ["正在读取墙体、房间、门窗和尺寸标注。"] });
+  try {
+    const { layout, recognition } = await realtimeApi("/import/floor-plan/image", {
+      method: "POST", body: file, contentType, signal: request.signal,
+    });
+    if (runId !== floorValidationRunId) return;
+    const name = file.name.replace(/\.[^.]+$/, "").trim();
+    const scene = loadLayoutScene({ ...layout, name: name || layout.name });
+    if (!scene.rooms.some((room) => !room.excludeFromRoutes)) throw new Error("没有识别到可用于设计的封闭室内空间。");
+    importedLayout = { scene, key: `image:${crypto.randomUUID()}` };
+    importedLayoutDraft = scene;
+    importLayoutButton.hidden = false;
+    importState.floor = true;
+    const dimensions = Array.isArray(recognition?.dimensions)
+      ? recognition.dimensions.filter((dimension) => Number.isFinite(dimension?.millimeters)) : [];
+    setFloorValidation({ status: "valid", title: "图片户型已识别", messages: [
+      `${scene.rooms.length} 个空间 · ${scene.walls.length} 段墙体 · ${scene.openings.length} 处门窗和通口`,
+      ...(dimensions.length === 2 ? [`按横纵标注 ${dimensions.map(({ millimeters }) => formatMillimeters(millimeters)).join(" × ")} 校准。`] : []),
+      ...scene.warnings.slice(0, 4),
+    ] });
+  } catch (error) {
+    if (runId !== floorValidationRunId) return;
+    input.value = "";
+    const message = error.name === "AbortError" ? "工作台账号已切换，请重新选择图片。" : formatRealtimeError(error);
+    setFloorValidation({ status: "invalid", title: "图片户型暂未识别", messages: [message] });
+  } finally {
+    if (rasterFloorRequest === request) rasterFloorRequest = null;
+    if (runId === floorValidationRunId) updateGenerateState();
+  }
+}
+
 async function validateFloorFile(input, files = input.files) {
   const file = files[0];
   if (!file && selectedFloorFile) {
@@ -3493,7 +3499,10 @@ async function validateFloorFile(input, files = input.files) {
 
   const extension = getFileExtension(file?.name ?? "");
   const runId = ++floorValidationRunId;
+  rasterFloorRequest?.abort();
+  rasterFloorRequest = null;
   clearImportedLayout();
+  clearFloorPreview();
 
   updateUploadLabel(input, files);
   importState.floor = false;
@@ -3506,12 +3515,14 @@ async function validateFloorFile(input, files = input.files) {
     return;
   }
 
-  setFloorPreviewMessage("正在读取图纸", ["上传后会解析 CAD 线段、房间边界和文字标注，并生成 2D 预览。"]);
+  const rasterType = APP_CONFIG.api?.realtimeBaseUrl && rasterFloorTypes.get(extension);
+  if (!rasterType) setFloorPreviewMessage("正在读取图纸", ["上传后会解析 CAD 线段、房间边界和文字标注，并生成 2D 预览。"]);
   setFloorValidation({
     status: "checking",
     title: "正在检查户型文件",
     messages: [
-      extension === ".dwg"
+      rasterType ? "正在检查图片格式。"
+        : extension === ".dwg"
         ? "正在上传 DWG 到本地后端，转换为 DXF 后检查规范。"
         : "正在检查文件格式、DXF 结构和 CAD 图层规范。",
     ],
@@ -3528,6 +3539,13 @@ async function validateFloorFile(input, files = input.files) {
     });
     clearFloorPreview();
     updateGenerateState();
+    return;
+  }
+
+  if (rasterType) {
+    selectedFloorFile = file;
+    renderRasterFloorPreview(file);
+    await importRasterFloor(file, rasterType, runId, input);
     return;
   }
 
@@ -3621,11 +3639,18 @@ function validateFloorFileFormat(file) {
     errors.push("文件为空，请重新导出有效的户型文件。");
   }
 
+  if (APP_CONFIG.api?.realtimeBaseUrl && rasterFloorTypes.has(extension)) {
+    if (file.size > maxRasterFloorBytes) errors.push("请上传不超过 8 MB 的户型图片。");
+    return errors;
+  }
+
   if (acceptedFloorExtensions.includes(extension)) {
     return errors;
   }
 
-  errors.push("请上传 DXF、DWG 或 RoomPlan / OpenPlan3D 的户型 JSON。");
+  errors.push(APP_CONFIG.api?.realtimeBaseUrl
+    ? "请选择 PNG、JPG、WebP 户型图，或导入 DXF、DWG 和户型 JSON。"
+    : "请上传 DXF、DWG 或 RoomPlan / OpenPlan3D 的户型 JSON。");
   return errors;
 }
 
@@ -3800,6 +3825,13 @@ function formatGenerationError(error) {
   return message || "方案生成失败，请检查图纸文件和本地后端服务。";
 }
 
+function formatRealtimeError(error) {
+  if (error instanceof TypeError && /fetch|load failed|networkerror/i.test(error.message)) {
+    return "无法连接设计工作台服务，请检查网络后重试。";
+  }
+  return error?.message || "暂时无法处理图纸，请稍后重试。";
+}
+
 function formatBackendValidationError(error) {
   const message = error instanceof Error ? error.message : "";
   if (/failed to fetch|load failed|networkerror/i.test(message)) {
@@ -3865,8 +3897,18 @@ function openRequestedRealtimeProject() {
   const query = new URLSearchParams(window.location.search);
   const projectId = query.get("project");
   const versionId = query.get("version");
-  if (!/^rt-[a-f0-9]{32}$/.test(projectId || "") || (versionId && !/^rv-[a-f0-9]{32}$/.test(versionId))) return;
-  const open = () => openRealtimeProject(projectId, versionId).catch(showRealtimeProjectError);
+  if (!projectId) return;
+  if (!/^rt-[a-f0-9]{32}$/.test(projectId) || (versionId && !/^rv-[a-f0-9]{32}$/.test(versionId))) {
+    showRealtimeProjectError(new Error("找不到该方案，请从方案库打开 3D 版本。"));
+    return;
+  }
+  const open = () => {
+    if (query.get("view") === "editor") {
+      window.location.replace(makeRealtimeStudioUrl(projectId, versionId));
+      return;
+    }
+    return openRealtimeProject(projectId, versionId).catch(showRealtimeProjectError);
+  };
   if (requireRealtimeLogin(open)) return open();
 }
 
@@ -3895,21 +3937,22 @@ async function openRealtimeProject(projectId, versionId = null) {
 
 function showRealtimeProject({ project, version, versions = [version] }) {
   const layout = loadLayoutScene(version.layout);
+  const floorPlan = toFloorPlan(layout);
   const style = stylePackages[version.styleId]?.label || "室内方案";
-  const cover = "./assets/showcase/new-plan-cover-cream.jpg";
-  const rooms = layout.rooms.filter((room) => !room.excludeFromRoutes).map((room) => ({
-    id: room.id, name: room.name, image: cover, alt: room.name, adjustable: false,
-  }));
+  const rooms = layout.rooms.filter((room) => !room.excludeFromRoutes)
+    .map(({ id, name }) => ({ id, name, adjustable: false }));
+  const area = floorPlan.room_boundaries.reduce((sum, room) => sum + room.area, 0) / 1e6;
   const rtVersions = versions.map((entry) => ({
-    ...entry, ...(entry.id === version.id ? { brief: version.brief, design: version.design } : {}),
-    title: `V${entry.number} · 实时 3D`, previewLabel: "实时 3D 漫游", scenes: rooms,
+    ...entry, ...(entry.id === version.id ? { revision: version.revision, brief: version.brief, design: version.design } : {}),
+    title: `V${entry.number} · 3D 方案`, previewLabel: "3D 布局预览", scenes: rooms,
     layoutScene: entry.id === version.id ? layout : null, deliverable: false,
   }));
   const sample = {
-    id: project.id, name: project.title, title: "室内漫游", status: `V${version.number} · 实时 3D`, style,
-    phase: "review", delivery: "实时 3D 漫游", area: `${rooms.length} 个空间`, realtime: true,
+    id: project.id, name: project.title, title: "3D 方案", status: `V${version.number} · 3D 方案`, style,
+    floorPlanImage: createFloorPlanImage(floorPlan, `${project.title}户型图`),
+    phase: "review", delivery: "3D 布局预览", area: `约 ${area.toLocaleString("zh-CN", { maximumFractionDigits: 1 })} m²`, realtime: true,
     rooms, initialScenes: rooms, plannedScenes: rooms, versions: rtVersions,
-    activeVersionId: version.id, serverActiveVersionId: project.activeVersionId, adjustments: [],
+    activeVersionId: version.id, adjustments: [],
   };
   realtimeProjects = [project, ...realtimeProjects.filter((entry) => entry.id !== project.id)];
   availableSamples = [sample, ...availableSamples.filter((entry) => entry.id !== sample.id)];
@@ -3918,7 +3961,7 @@ function showRealtimeProject({ project, version, versions = [version] }) {
   closeSchemeLayout();
   renderSampleList();
   renderScheme();
-  setSchemePane("layout");
+  setSchemePane("preview");
   setTab("scheme-detail");
   const url = new URL(window.location.pathname, window.location.origin);
   url.search = new URLSearchParams({ project: project.id, version: version.id }).toString();
@@ -3977,8 +4020,8 @@ async function openRealtimeShare(token) {
   const events = new AbortController();
   realtimeFeedbackEvents = events;
   try {
-    const [{ project, version }, { createLayoutWorkspace }] = await Promise.all([
-      realtimeApi(`/realtime-shares/${token}`, { shared: true }), import("./layout-review/workspace.js?v=cream-v6-3"),
+    const [{ project, version }, { mountFloorplanStudio }] = await Promise.all([
+      realtimeApi(`/realtime-shares/${token}`, { shared: true }), import("./floorplan-studio/bridge.js"),
     ]);
     if (events.signal.aborted) return;
     const model = loadLayoutScene(version.layout);
@@ -3994,11 +4037,27 @@ async function openRealtimeShare(token) {
       const names = [room?.name, selectedItem?.name].filter(Boolean).join(" · ");
       anchorLabel.textContent = names ? `反馈位置 · ${names}` : "可以先在漫游里选择一件家具。";
     }
-    activeRealtimeShare = createLayoutWorkspace(stage, {
-      source: model, key: `share:${version.id}`, readOnly: true, initialMode: "walk", styleId: version.styleId,
-      music: realtimeMusic(version.musicId, project.id, version.id),
-      onWalkRoom(id) { roomId = id; updateAnchor(); },
-      onSelectItem(id) { selectedItem = model.items.find((entry) => entry.id === id) || null; updateAnchor(); },
+    const music = realtimeMusic(version.musicId, project.id, version.id);
+    const selectItem = (id) => { selectedItem = model.items.find((entry) => entry.id === id) || null; updateAnchor(); };
+    activeRealtimeShare = mountFloorplanStudio(stage, {
+      source: model, readOnly: true, initialMode: "walk", styleId: version.styleId, music,
+      onSelection(selection) {
+        if (Object.hasOwn(selection, "roomId")) roomId = model.rooms.find((entry) => entry.id === selection.roomId)?.id || null;
+        selectItem(selection.itemId);
+      },
+      async onError(error) {
+        try {
+          const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=studio-version-save");
+          if (events.signal.aborted) return;
+          activeRealtimeShare = createLayoutWorkspace(stage, {
+            source: model, key: `share:${version.id}`, readOnly: true, initialMode: "walk", styleId: version.styleId, music,
+            onWalkRoom(id) { roomId = id; updateAnchor(); },
+            onSelectItem: selectItem,
+          });
+        } catch {
+          if (!events.signal.aborted) { form.hidden = true; showRealtimeShareError(error.message); }
+        }
+      },
     });
     form.hidden = false;
     form.addEventListener("submit", async (event) => {
@@ -4031,43 +4090,18 @@ function realtimeVersionPath(sample, version) {
   return `/realtime-projects/${sample.id}/versions/${version.id}`;
 }
 
-async function shareRealtimeVersion(sample, version) {
-  const field = realtimeExtras.querySelector("[data-realtime-copy-link]");
-  const { token, shareId } = await realtimeApi(`${realtimeVersionPath(sample, version)}/shares`, { method: "POST" });
-  const link = makeRealtimeShareUrl(token);
-  if (field?.isConnected) {
-    field.hidden = false;
-    field.value = link;
-    field.dataset.shareId = shareId;
-  }
-  try {
-    await navigator.clipboard.writeText(link);
-    return "版本分享链接已复制。";
-  } catch {
-    field?.focus();
-    field?.select();
-    return "版本分享链接已生成。";
-  }
-}
-
 function renderRealtimeExtras(sample, version) {
   realtimeExtras.hidden = !sample.realtime;
   realtimeExtras.replaceChildren();
   if (!sample.realtime) return;
-  const designSummary = createRealtimeDesignSummary(version.design, version.layoutScene, version.brief);
+  const designSummary = createRealtimeDesignSummary(version.design, version.layoutScene, version.brief, version.revision);
   if (designSummary) realtimeExtras.append(designSummary);
-  const link = document.createElement("input");
-  link.dataset.realtimeCopyLink = "";
-  link.setAttribute("aria-label", "当前版本的可分享链接");
-  link.type = "url";
-  link.readOnly = true;
-  link.hidden = true;
   const details = document.createElement("details");
   const summary = document.createElement("summary");
   summary.textContent = "客户反馈与分享管理";
   const contents = document.createElement("div");
   details.append(summary, contents);
-  realtimeExtras.append(link, details);
+  realtimeExtras.append(details);
 
   async function loadFeedback() {
     const path = realtimeVersionPath(sample, version);
@@ -4108,7 +4142,6 @@ function renderRealtimeExtras(sample, version) {
           revoke.disabled = true;
           try {
             await realtimeApi(`${path}/shares/${entry.shareId}/revoke`, { method: "POST" });
-            if (link.dataset.shareId === entry.shareId) { link.value = ""; link.hidden = true; }
             await loadFeedback();
           } catch (error) { revoke.textContent = error.message || "停用失败"; revoke.disabled = false; }
         });
@@ -4457,6 +4490,10 @@ function renderFloorValidation() {
 }
 
 function clearFloorPreview() {
+  if (floorPreviewObjectUrl) {
+    URL.revokeObjectURL(floorPreviewObjectUrl);
+    floorPreviewObjectUrl = null;
+  }
   if (!floorPreviewPanel) {
     return;
   }
@@ -4464,6 +4501,18 @@ function clearFloorPreview() {
   const uploadPanel = floorPreviewPanel.closest(".upload-panel");
   uploadPanel?.classList.remove("has-floor-preview");
   uploadPanel?.style.removeProperty("--post-upload-region-width");
+}
+
+function renderRasterFloorPreview(file) {
+  if (!floorPreviewPanel) return;
+  const image = document.createElement("img");
+  image.alt = `${file.name} 户型图预览`;
+  image.className = "floor-preview-image";
+  floorPreviewObjectUrl = URL.createObjectURL(file);
+  image.src = floorPreviewObjectUrl;
+  floorPreviewPanel.closest(".upload-panel")?.classList.add("has-floor-preview");
+  floorPreviewPanel.replaceChildren(image);
+  syncPostUploadRegionWidth();
 }
 
 function setFloorPreviewMessage(title, messages = []) {
@@ -5173,6 +5222,7 @@ function setTab(tab) {
   });
 
   window.scrollTo({ top: 0, left: 0 });
+  syncRealtimeSchemePreview();
   syncVrBackgroundMusic();
 }
 
@@ -5191,32 +5241,22 @@ async function renderSchemeLayout(sample, version, initialMode, initialRoomId) {
   const attempt = layoutLoadSequence;
   activeSchemeLayoutKey = key;
   activeSchemeLayoutMode = initialMode;
-  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=cream-v6-3");
+
+  const { createLayoutWorkspace } = await import("./layout-review/workspace.js?v=studio-version-save");
   if (attempt !== layoutLoadSequence) return;
   const styleId = version.styleId || Object.keys(stylePackages).find((id) => stylePackages[id].label === sample.style) || "cream";
   const musicId = version.musicId ?? (sample.id === "jindi-dacheng-119-cream-v1" ? "woodlight" : null);
   const readOnly = !canUseDesignerWorkspace || (version.realtimeWalkthrough === true && initialMode !== "3d");
   const canSave = Boolean(APP_CONFIG.api?.realtimeBaseUrl);
-  async function saveVersion(scene) {
-    if (!sample.realtime) {
-      await createRealtimeProject(scene, { title: sample.name, styleId });
-      return "已将此布局保存为独立项目的 V1。";
-    }
-    const result = await realtimeApi(`/realtime-projects/${sample.id}/versions`, { method: "POST", body: {
-      baseVersionId: version.id, expectedActiveVersionId: sample.serverActiveVersionId, layout: scene,
-    } });
-    schemeLayoutDrafts.delete(key);
-    try { localStorage.removeItem(`xspace:layout:${key}`); } catch { /* Saving the version does not depend on browser storage. */ }
-    if (activeSchemeLayoutKey === key) showRealtimeProject({ ...result, versions: [result.version, ...sample.versions] });
-    else await loadRealtimeProjects();
-  }
-  renderRealtimeExtras(sample, version);
   const firstScene = version.visualProfile ? version.scenes?.[0] : null;
+  async function saveVersion(scene) {
+    await createRealtimeProject(scene, { title: sample.name, styleId });
+    return "已将此布局保存为独立项目的 V1。";
+  }
   activeSchemeLayout = createLayoutWorkspace(schemeLayoutHolder, {
     source: version.layoutScene, key, draft: schemeLayoutDrafts.get(key), styleId, readOnly, initialMode,
     initialRoomId: initialRoomId || firstScene?.roomId || firstScene?.id || "",
-    visualProfile: version.visualProfile,
-    music: realtimeMusic(musicId, sample.id, version.id),
+    visualProfile: version.visualProfile, music: realtimeMusic(musicId, sample.id, version.id),
     panoramaCaptureLabel: version.realtimeWalkthrough ? `${sample.name}-${sample.style}-V${version.number}` : null,
     onSceneChange(scene) { schemeLayoutDrafts.set(key, scene); },
     onSaveVersion: canSave && !readOnly ? async (scene) => {
@@ -5224,8 +5264,7 @@ async function renderSchemeLayout(sample, version, initialMode, initialRoomId) {
       if (!requireRealtimeLogin(afterLogin)) throw new Error("登录后继续保存到工作台。");
       return saveVersion(scene);
     } : null,
-    allowSaveUnchanged: !sample.realtime, saveVersionLabel: sample.realtime ? "保存为新版本" : "从此布局创建方案",
-    onShareVersion: sample.realtime ? () => shareRealtimeVersion(sample, version) : null,
+    allowSaveUnchanged: true, saveVersionLabel: "从此布局创建方案",
   });
 }
 
@@ -5234,19 +5273,19 @@ function setSchemePane(pane, { mode, roomId = "" } = {}) {
   const version = getActiveVersion(sample);
   const hasWalkthrough = Boolean(version?.realtimeWalkthrough && version.layoutScene);
   const layoutAvailable = Boolean(version?.layoutScene && (canUseDesignerWorkspace || hasWalkthrough));
-  const targetPane = sample?.realtime && layoutAvailable && pane !== "versions" ? "layout" : pane === "layout" && !layoutAvailable ? "preview"
+  const targetPane = sample?.realtime && pane !== "versions" ? "preview" : pane === "layout" && !layoutAvailable ? "preview"
     : isFinalOnlyPane(pane) && sample && !hasFinalVersion(sample) ? "adjust" : pane;
 
   schemeTabButtons.forEach((button) => {
     const isFinalOnly = button.hasAttribute("data-final-only");
-    const isPrivateOtherView = sample?.realtime && ["preview", "adjust"].includes(button.dataset.schemeTab);
+    const isPrivateOtherView = sample?.realtime && ["layout", "adjust"].includes(button.dataset.schemeTab);
     const isLocked = isPrivateOtherView || (isFinalOnly && sample && !hasFinalVersion(sample)) || (button.dataset.schemeTab === "layout" && !layoutAvailable);
     const isActive = button.dataset.schemeTab === targetPane;
     button.hidden = isLocked;
     button.disabled = isLocked;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-selected", String(isActive));
-    if (button.dataset.schemeTab === "layout") button.textContent = sample?.realtime ? "3D 方案" : hasWalkthrough ? "实时 3D" : "3D 校对";
+    if (button.dataset.schemeTab === "layout") button.textContent = hasWalkthrough ? "实时 3D" : "3D 校对";
   });
 
   schemePanes.forEach((item) => {
@@ -5260,12 +5299,13 @@ function setSchemePane(pane, { mode, roomId = "" } = {}) {
   if (targetPane === "layout") {
     const key = `${sample.id}:${version.id}`;
     const initialMode = mode || (activeSchemeLayoutKey === key && activeSchemeLayoutMode)
-      || (sample.realtime || hasWalkthrough ? "walk" : "3d");
+      || (hasWalkthrough ? "walk" : "3d");
     renderSchemeLayout(sample, version, initialMode, roomId).catch((error) => {
       if (activeSchemeLayoutKey !== key || activeSchemeLayoutMode !== initialMode) return;
       schemeLayoutHolder.textContent = error?.message || "暂时无法打开 3D 场景。";
     });
   } else if (activeSchemeLayoutKey) closeSchemeLayout();
+  syncRealtimeSchemePreview();
   syncVrBackgroundMusic();
 }
 
@@ -5296,7 +5336,7 @@ function renderSampleList() {
           <small>导入图纸</small>
         </span>
         <span class="project-meta" aria-label="创建流程">
-          <span>DXF / DWG</span>
+          <span>上传户型图</span>
           <span>选择风格</span>
         </span>
       </span>
@@ -5316,45 +5356,8 @@ function renderSampleList() {
     cards.push(button);
   }
 
-  cards.push(
-    ...availableSamples.filter((sample) => !sample.realtime).map((sample) => {
-      const room = getSampleCoverScene(sample);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = sample.id === activeSampleId ? "project-card is-active" : "project-card";
-      button.innerHTML = `
-        <span class="project-thumb">
-          <img src="${room.image}" alt="${room.alt}" loading="lazy" />
-          <span class="status-pill">${sample.status}</span>
-        </span>
-        <span class="project-body">
-          <span class="project-eyebrow">${getActiveVersion(sample)?.previewLabel || sample.delivery}</span>
-          <span class="project-title-line">
-            <strong>${sample.name}</strong>
-            <small>${sample.title}</small>
-          </span>
-          <span class="project-meta" aria-label="方案参数">
-            <span>${sample.area}</span>
-            <span>${sample.style}</span>
-            <span>${getProjectSceneCount(sample)} 场景</span>
-          </span>
-        </span>
-      `;
-      button.addEventListener("click", () => {
-        activeSampleId = sample.id;
-        activeRoomId = getPreviewScenes(sample)[0]?.id || sample.rooms[0]?.id;
-        activeAdjustSceneId = getAdjustableScenes(sample)[0]?.id || "";
-        renderSampleList();
-        renderScheme();
-        setSchemePane(getPreferredSchemePaneForSample(sample));
-        setTab("scheme-detail");
-      });
-      return button;
-    })
-  );
-
   if (!cards.length) {
-    sampleList.replaceChildren(createLibraryEmptyState("暂无案例", "还没有可查看的原有案例。"));
+    sampleList.replaceChildren(createLibraryEmptyState("暂无案例", "还没有可查看的 3D 方案。"));
     return;
   }
   sampleList.replaceChildren(...cards);
@@ -5491,26 +5494,75 @@ function renderScheme() {
     activeRoomId = room.id;
   }
   const activeVersion = getActiveVersion(sample);
+  const realtime = sample.realtime === true;
 
   detailStatus.textContent = getSchemeStatus(sample);
   detailTitle.textContent = `${sample.name} · ${activeVersion ? `${sample.style} ${activeVersion.title}` : sample.title}`;
-  const previewVrAvailable = isPreviewVrAvailable(activeVersion);
-  renderPreviewVr(sample, activeVersion, room);
-  detailRoomName.textContent = previewVrAvailable ? "全屋 VR" : room.name;
-  detailSummary.textContent = [room?.description, activeVersion?.summary || sample.summary].filter(Boolean).join(" ");
+  const previewVrAvailable = !realtime && isPreviewVrAvailable(activeVersion);
+  if (realtime) {
+    stopInlineVrRenderLoop();
+    if (inlineVrPreview) inlineVrPreview.hidden = true;
+    detailImage.hidden = true;
+  } else renderPreviewVr(sample, activeVersion, room);
+  detailRoomName.textContent = realtime ? "整屋布局" : previewVrAvailable ? "全屋 VR" : (room?.name || "方案预览");
+  detailSummary.textContent = realtime ? "" : [room?.description, activeVersion?.summary || sample.summary].filter(Boolean).join(" ");
+  detailSummary.hidden = !detailSummary.textContent;
   detailArea.textContent = sample.area;
   detailStyle.textContent = sample.style;
   detailDelivery.textContent = previewVrAvailable ? "VR全景方案" : activeVersion ? (activeVersion.previewLabel || "效果图预览") : "第一版生成中";
   renderWalkthroughLinks(sample, activeVersion, room);
   renderPreviewFloorPlan(sample, activeVersion);
+  renderRealtimeExtras(sample, activeVersion);
+  const canEditRealtime = realtime && canUseDesignerWorkspace && Boolean(activeVersion?.layoutScene);
+  realtimeEditorEntry.hidden = !canEditRealtime;
+  if (canEditRealtime) realtimeEditorLink.href = makeRealtimeStudioUrl(sample.id, activeVersion.id);
+  else realtimeEditorLink.removeAttribute("href");
 
-  renderSceneTabs(detailRoomTabs, previewVrAvailable ? [] : scenes, activeRoomId, (sceneId) => {
+  renderSceneTabs(detailRoomTabs, realtime || previewVrAvailable ? [] : scenes, activeRoomId, (sceneId) => {
     activeRoomId = sceneId;
     renderScheme();
   });
-  renderAdjustPanel(sample);
+  if (!realtime) renderAdjustPanel(sample);
   renderVersionPane(sample);
   setSchemePane(getActiveSchemePane());
+}
+
+function syncRealtimeSchemePreview() {
+  const sample = getActiveSample();
+  const version = getActiveVersion(sample);
+  realtimePreviewImage.hidden = !sample?.realtime || !version?.layoutScene;
+  const shouldShow = !realtimePreviewImage.hidden && activeTab === "scheme-detail" && getActiveSchemePane() === "preview";
+  const cacheKey = shouldShow ? `${version.id}:${version.revision ?? 1}` : "";
+  const key = cacheKey ? `${sample.id}:${cacheKey}` : "";
+  if (activeRealtimePreview?.key === key) return;
+  activeRealtimePreview?.view?.dispose();
+  realtimePreviewImage.replaceChildren();
+  activeRealtimePreview = null;
+  if (!key) return;
+
+  const attempt = { key, view: null };
+  activeRealtimePreview = attempt;
+  const status = document.createElement("p");
+  status.className = "floorplan-preview-status";
+  status.textContent = "正在准备布局预览…";
+  status.setAttribute("role", "status");
+  realtimePreviewImage.append(status);
+  import("./floorplan-studio/preview-image.js").then(({ mountFloorplanPreview }) => {
+    if (activeRealtimePreview !== attempt) return;
+    attempt.view = mountFloorplanPreview(realtimePreviewImage, {
+      scene: version.layoutScene, styleId: version.styleId, cacheKey,
+    });
+  }).catch(() => {
+    if (activeRealtimePreview !== attempt) return;
+    if (!sample.floorPlanImage) {
+      status.textContent = "暂时无法显示布局预览。";
+      return;
+    }
+    const image = document.createElement("img");
+    image.src = sample.floorPlanImage;
+    image.alt = `${sample.name} 户型预览`;
+    realtimePreviewImage.replaceChildren(image);
+  });
 }
 
 function renderWalkthroughLinks(sample, version, room) {
@@ -5595,10 +5647,6 @@ function getSchemeStatus(sample) {
 
 function getActiveSchemePane() {
   return schemePanes.find((pane) => pane.classList.contains("is-active"))?.dataset.schemePane || "preview";
-}
-
-function getPreferredSchemePaneForSample(sample) {
-  return (sample?.versions || []).length > 1 ? "versions" : sample?.realtime ? "layout" : "preview";
 }
 
 function renderSceneTabs(container, scenes, activeId, onSelect) {
@@ -7134,7 +7182,7 @@ function renderVersionPane(sample) {
   }
 
   if (!hasFinalVersion(sample)) {
-    versionList.replaceChildren(createEmptyState("暂无方案版本", "第一版方案生成成功后会写入 V1；之后每次调整都会新增版本。"));
+    versionList.replaceChildren(createEmptyState("暂无方案版本", "生成 3D 首版后，这里会显示 V1。"));
     return;
   }
 
@@ -7149,10 +7197,18 @@ function renderVersionPane(sample) {
     const title = document.createElement("strong");
     title.textContent = version.createdAt;
     const summary = document.createElement("p");
-    const qualityLabel = version.previewLabel || (sample.previewOnly ? "效果图初稿" : version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿");
-    summary.textContent = version.adjustments?.length
-      ? `${qualityLabel}，应用 ${version.adjustments.length} 条调整，${version.scenes.length} 个场景。`
-      : `${qualityLabel}，未额外调整，${version.scenes.length} 个场景。`;
+    if (sample.realtime) {
+      const created = new Date(version.createdAt);
+      if (Number.isFinite(created.getTime())) {
+        title.textContent = created.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" });
+      }
+      summary.textContent = version.revision > 1 ? "3D 布局预览 · 已覆盖保存" : "3D 布局预览";
+    } else {
+      const qualityLabel = version.previewLabel || (sample.previewOnly ? "效果图初稿" : version.deliverable ? "可交付" : isRealPanoramaPackage(version.vrPackage) ? "可查看" : "草稿");
+      summary.textContent = version.adjustments?.length
+        ? `${qualityLabel}，应用 ${version.adjustments.length} 条调整，${version.scenes.length} 个场景。`
+        : `${qualityLabel}，未额外调整，${version.scenes.length} 个场景。`;
+    }
     card.append(label, title, summary);
     card.addEventListener("click", () => {
       if (sample.realtime) { openRealtimeProject(sample.id, version.id).catch(showRealtimeProjectError); return; }

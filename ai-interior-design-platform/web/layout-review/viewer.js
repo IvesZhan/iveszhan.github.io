@@ -1,10 +1,11 @@
 import * as THREE from "./vendor/three.module.min.js";
-import { containsPoint, getLayoutBounds, isDiningTable } from "./scene.js";
-import { createWalkNavigation } from "./walk-navigation.js";
+import { containsPoint, getLayoutBounds, isDiningTable } from "./scene.js?v=studio-version-save";
+import { createWalkNavigation } from "./walk-navigation.js?v=cream-v7";
+import { planWalkRoute } from "./walk-route.js";
 import { createWalkAppearance } from "./walk-appearance.js?v=cream-v6-3";
 import { loadWalkFurniture } from "./walk-furniture.js?v=cream-v6-3";
-import { applyBoxFinish, createWalkFitout, makeCreamCoffeeTable, makeWalkMillwork, makeWalkRoundTable, surfaceMaterial } from "./walk-fitout.js?v=cream-v6-3";
-import { createWalkLighting, exteriorWindows } from "./walk-lighting.js?v=cream-v6-3";
+import { applyBoxFinish, createWalkFitout, makeCreamCoffeeTable, makeWalkMillwork, makeWalkRoundTable, surfaceMaterial } from "./walk-fitout.js?v=cream-v7-interior";
+import { createWalkLighting, exteriorWindows } from "./walk-lighting.js?v=cream-v7-interior";
 import { makeWalkFixture } from "./walk-fixtures.js";
 
 const colors = {
@@ -12,6 +13,11 @@ const colors = {
   wall: 0xf5f1e7, wallTop: 0xbcb9a7, window: 0xa5b6b3,
   opening: 0x849589, furniture: 0xb19b7e, softFurniture: 0xc4bfae,
   selection: 0x4f826d, issue: 0xad5a4c,
+};
+
+const previewFloorColors = {
+  wood: 0xdcc4a5, walnut: 0xbda184, tile800: 0xe9e3d7, tile600: 0xe4dfd7,
+  marble: 0xeee8dd, antislip: 0xd9d3c7, terrazzo: 0xded8ca, carpet: 0xdacfc2,
 };
 
 function line(scene, a, b, color, height = 0.025) {
@@ -291,9 +297,25 @@ function findBedroomFrame(bed, room, entry, windowView, navigation) {
   return { position, aim };
 }
 
-export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onWalkNotice, styleId, visualProfile } = {}) {
+function viewpointPose(viewpoint, navigation) {
+  const preferred = viewpoint.walkView;
+  const [walkX, , walkZ] = preferred?.positionM ?? [];
+  const framing = preferred && navigation.canOccupy([walkX, walkZ]) ? preferred : viewpoint;
+  const [x, height, z] = framing.positionM;
+  const [targetX, targetHeight, targetZ] = framing.targetM;
+  return {
+    position: [x, z], height,
+    yaw: Math.atan2(x - targetX, z - targetZ),
+    pitch: THREE.MathUtils.clamp(Math.atan2(targetHeight - height, Math.hypot(x - targetX, z - targetZ)), -1.16, 1.16),
+    fieldOfView: framing.verticalFovDeg ?? 52,
+  };
+}
+
+export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onWalkNotice, onGuideChange, styleId, visualProfile, overviewPreview = false } = {}) {
+  const refined = styleId === "cream" && visualProfile === "cream-v7";
+  const finishProfile = refined ? "cream-v6" : visualProfile;
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setClearColor(colors.background);
+  renderer.setClearColor(overviewPreview ? 0xf3f0e8 : colors.background);
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute("aria-label", "户型模型，拖动旋转，滚轮缩放");
@@ -306,7 +328,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
   const light = new THREE.DirectionalLight(0xfff3e8, 1.9);
   light.position.set(-5, 9, 10);
   world.add(light);
-  const lighting = createWalkLighting(renderer, world, render, styleId === "cream", { visualProfile });
+  const lighting = createWalkLighting(renderer, world, render, styleId === "cream", { visualProfile: finishProfile, refined });
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 400);
   const walkCamera = new THREE.PerspectiveCamera(62, 1, 0.027, 100);
   walkCamera.rotation.order = "YXZ";
@@ -328,6 +350,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
   let pitch = 0;
   let walkFieldOfView = 47;
   let lastFrame = null;
+  let guide = null;
   const heldKeys = new Set();
   const touchDirections = new Set();
   const raycaster = new THREE.Raycaster();
@@ -358,6 +381,8 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
 
   function reportWalkPosition() {
     const room = walkPosition ? navigation?.roomAt(walkPosition) : null;
+    // Keep the last room active across the shared doorway between its floor and the next room's floor.
+    if (walkPosition && !room && walkRoomId) return;
     const id = room?.id || null;
     if (id !== walkRoomId) {
       walkRoomId = id;
@@ -366,9 +391,25 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
     }
   }
 
+  function applyViewpoint({ position, height, yaw: heading, pitch: tilt, fieldOfView }) {
+    walkPosition = [...position];
+    walkEyeHeight = height;
+    yaw = heading;
+    pitch = tilt;
+    walkFieldOfView = fieldOfView;
+    reportWalkPosition();
+  }
+
   function placeWalker(roomId = null) {
-    const nextPosition = navigation?.spawn(roomId);
     clearWalkInput();
+    const viewpoint = model.viewpoints?.filter((candidate) => !roomId || candidate.roomId === roomId)
+      .map((candidate) => viewpointPose(candidate, navigation)).find((pose) => navigation.canOccupy(pose.position));
+    if (viewpoint) {
+      applyViewpoint(viewpoint);
+      onWalkNotice?.("");
+      return;
+    }
+    const nextPosition = navigation?.spawn(roomId);
     if (!nextPosition) {
       if (!walkPosition || !navigation?.canOccupy(walkPosition)) walkPosition = null;
       onWalkNotice?.("当前空间内没有足够的站立位置。可在平面视图调整布局。");
@@ -458,11 +499,94 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
     reportWalkPosition();
   }
 
+  function stopGuide(message = "") {
+    if (!guide) return;
+    guide = null;
+    lastFrame = null;
+    onGuideChange?.(false);
+    onWalkNotice?.(message);
+  }
+
+  function startGuide() {
+    if (mode !== "walk" || !model?.viewpoints || guide) return;
+    if (!navigation?.canOccupy(walkPosition)) {
+      onWalkNotice?.("请选择一个可站立的房间后开始导览。");
+      return;
+    }
+    clearWalkInput();
+    guide = { queue: [...model.viewpoints], total: model.viewpoints.length, arrived: 0, missed: [], stop: null };
+    onGuideChange?.(true);
+    onWalkNotice?.("正在计算房间之间的动线…");
+    render();
+  }
+
+  function turnForGuide(heading, tilt, elapsed) {
+    const difference = Math.atan2(Math.sin(heading - yaw), Math.cos(heading - yaw));
+    yaw += THREE.MathUtils.clamp(difference, -2.05 * elapsed, 2.05 * elapsed);
+    pitch += THREE.MathUtils.clamp(tilt - pitch, -0.9 * elapsed, 0.9 * elapsed);
+    return Math.abs(difference);
+  }
+
+  function stepGuide(elapsed) {
+    if (!guide.stop) {
+      const viewpoint = guide.queue.shift();
+      if (!viewpoint) {
+        const { arrived, total, missed } = guide;
+        stopGuide(missed.length ? `已导览 ${arrived}/${total} 个机位。无法到达${missed.join("、")}，请检查门扇和通道。`
+          : `已完成 ${total} 个机位的动线导览。`);
+        return false;
+      }
+      const pose = viewpointPose(viewpoint, navigation);
+      const route = planWalkRoute(model, navigation, walkPosition, pose.position);
+      if (route) {
+        guide.stop = { viewpoint, pose, route, pause: 1.5, stalled: 0 };
+        onWalkNotice?.(`前往${viewpoint.name} · ${guide.total - guide.queue.length}/${guide.total}`);
+      } else guide.missed.push(viewpoint.name);
+      return true;
+    }
+
+    const { stop } = guide;
+    const next = stop.route[0];
+    walkEyeHeight += THREE.MathUtils.clamp(stop.pose.height - walkEyeHeight, -0.35 * elapsed, 0.35 * elapsed);
+    if (!next) {
+      turnForGuide(stop.pose.yaw, stop.pose.pitch, elapsed);
+      walkFieldOfView += THREE.MathUtils.clamp(stop.pose.fieldOfView - walkFieldOfView, -18 * elapsed, 18 * elapsed);
+      stop.pause -= elapsed;
+      if (stop.pause <= 0) {
+        applyViewpoint(stop.pose);
+        guide.arrived += 1;
+        guide.stop = null;
+      }
+      return true;
+    }
+
+    const dx = next[0] - walkPosition[0];
+    const dz = next[1] - walkPosition[1];
+    const gap = Math.hypot(dx, dz);
+    if (gap < 0.006) {
+      walkPosition = next;
+      stop.route.shift();
+    } else if (turnForGuide(Math.atan2(-dx, -dz), -0.04, elapsed) < 0.68 && elapsed > 0) {
+      const step = Math.min(1, 1.1 * elapsed / gap);
+      const reached = navigation.move(walkPosition, [dx * step, dz * step]);
+      const progress = Math.hypot(reached[0] - walkPosition[0], reached[1] - walkPosition[1]);
+      walkPosition = reached;
+      stop.stalled = progress < 0.001 ? stop.stalled + elapsed : 0;
+      if (stop.stalled > 0.3) {
+        guide.missed.push(stop.viewpoint.name);
+        guide.stop = null;
+      }
+    }
+    reportWalkPosition();
+    return true;
+  }
+
   function stepWalk(timestamp) {
     const directions = new Set([...heldKeys].map((key) => walkKeys.get(key)).concat([...touchDirections]));
-    if (!directions.size) { lastFrame = null; return false; }
+    if (!directions.size && !guide) { lastFrame = null; return false; }
     const elapsed = lastFrame === null ? 0 : Math.min(0.09, Math.max(0, (timestamp - lastFrame) / 1000));
     lastFrame = timestamp;
+    if (guide) return stepGuide(elapsed);
     const right = Number(directions.has("right")) - Number(directions.has("left"));
     const forward = Number(directions.has("forward")) - Number(directions.has("backward"));
     const distance = 1.55 * elapsed / (Math.hypot(right, forward) || 1);
@@ -512,32 +636,51 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
         if (moving) render();
         return;
       }
-      const distance = 80;
-      if (mode === "plan") {
-        camera.up.set(0, 0, -1);
-        camera.position.set(target.x, distance, target.z);
-      } else {
-        camera.up.set(0, 1, 0);
-        camera.position.set(target.x + distance * Math.sin(theta) * Math.sin(phi), distance * Math.cos(phi), target.z + distance * Math.cos(theta) * Math.sin(phi));
-      }
-      camera.lookAt(target);
-      camera.updateMatrixWorld(true);
-      const view = new THREE.Box3();
-      if (framePoints.length) {
-        const projected = new THREE.Vector3();
-        for (const point of framePoints) view.expandByPoint(projected.copy(point).applyMatrix4(camera.matrixWorldInverse));
-      } else {
-        view.set(new THREE.Vector3(-4, -4, -80), new THREE.Vector3(4, 4, -80));
-      }
-      const size = view.getSize(new THREE.Vector3());
-      const center = view.getCenter(new THREE.Vector3());
-      const vertical = Math.max(size.y, size.x / aspect, 1) * 0.59 / zoom;
-      camera.left = center.x - vertical * aspect;
-      camera.right = center.x + vertical * aspect;
-      camera.top = center.y + vertical;
-      camera.bottom = center.y - vertical;
-      camera.updateProjectionMatrix();
-      renderer.render(world, camera);
+      renderOverview(aspect);
+    });
+  }
+
+  function renderOverview(aspect) {
+    const distance = 80;
+    if (mode === "plan") {
+      camera.up.set(0, 0, -1);
+      camera.position.set(target.x, distance, target.z);
+    } else {
+      camera.up.set(0, 1, 0);
+      camera.position.set(target.x + distance * Math.sin(theta) * Math.sin(phi), distance * Math.cos(phi), target.z + distance * Math.cos(theta) * Math.sin(phi));
+    }
+    camera.lookAt(target);
+    camera.updateMatrixWorld(true);
+    const view = new THREE.Box3();
+    if (framePoints.length) {
+      const projected = new THREE.Vector3();
+      for (const point of framePoints) view.expandByPoint(projected.copy(point).applyMatrix4(camera.matrixWorldInverse));
+    } else {
+      view.set(new THREE.Vector3(-4, -4, -80), new THREE.Vector3(4, 4, -80));
+    }
+    const size = view.getSize(new THREE.Vector3());
+    const center = view.getCenter(new THREE.Vector3());
+    const vertical = Math.max(size.y, size.x / aspect, 1) * 0.59 / zoom;
+    camera.left = center.x - vertical * aspect;
+    camera.right = center.x + vertical * aspect;
+    camera.top = center.y + vertical;
+    camera.bottom = center.y - vertical;
+    camera.updateProjectionMatrix();
+    renderer.render(world, camera);
+  }
+
+  function captureOverview({ width, height }) {
+    if (!overviewPreview || !model || disposed || contextLost || renderer.getContext().isContextLost()) {
+      throw new Error("无法生成整屋 3D 预览。");
+    }
+    renderer.setPixelRatio(1);
+    renderer.setSize(width, height, false);
+    renderOverview(width / height);
+    return new Promise((resolve, reject) => {
+      renderer.domElement.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("无法生成整屋 3D 预览。"));
+      }, "image/png");
     });
   }
 
@@ -584,6 +727,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
   }
 
   function update(scene, { reset = false } = {}) {
+    if (reset || model !== scene) stopGuide();
     const priorDoorState = model === scene && navigation ? new Map(doorMeshes.map((mesh) => [mesh.userData.openingId, mesh.userData.isOpen])) : new Map();
     model = scene;
     disposeGroup(layout);
@@ -603,14 +747,14 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
     windows = walking ? exteriorWindows(scene) : [];
     lighting.update(scene, walking, windows);
     if (walking && !appearance) {
-      appearance = createWalkAppearance(styleId, render, { visualProfile });
-      fitout = createWalkFitout();
+      appearance = createWalkAppearance(styleId, render, { visualProfile: finishProfile });
+      fitout = createWalkFitout({ refined });
     }
     if (walking && !postLoading) {
       postLoading = true;
-      import("./walk-post.js?v=cream-v6-3").then(({ createWalkPost }) => {
+      import("./walk-post.js?v=cream-v7-interior").then(({ createWalkPost }) => {
         if (disposed || contextLost) return;
-        walkPost = createWalkPost(renderer, world, walkCamera, { cream: styleId === "cream" });
+        walkPost = createWalkPost(renderer, world, walkCamera, { cream: styleId === "cream", refined });
         if (viewportWidth && viewportHeight) walkPost?.resize(viewportWidth, viewportHeight);
         if (isInteriorView(mode)) render();
       }).catch(() => { /* Direct rendering is still available. */ });
@@ -629,7 +773,9 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
         const finish = appearance.floor(room);
         layout.add(floor(room, finish.color, finish), floor(room, appearance.ceiling, { height: ceiling }));
       } else {
-        layout.add(floor(room, colors.floors[index % colors.floors.length]), roomLabel(room));
+        const base = colors.floors[index % colors.floors.length];
+        const finish = overviewPreview && previewFloorColors[room.editorMaterial];
+        layout.add(floor(room, finish || base), roomLabel(room));
       }
     }
     scene.walls.forEach((wall) => addWall(layout, wall, scene.openings.filter((opening) => opening.wallId === wall.id),
@@ -646,7 +792,17 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
       }
       const asset = walking && walkFurniture?.create(item, { facing, appearance });
       if (asset) { layout.add(asset.group); itemMeshes.push(...asset.meshes); }
-      else itemMeshes.push(...furniture(layout, item, !walking, walking ? appearance : null, roomsById.get(item.roomId)));
+      else {
+        const meshes = furniture(layout, item, !walking, walking ? appearance : null, roomsById.get(item.roomId));
+        if (overviewPreview && item.editorColor) {
+          const finish = new THREE.Color(item.editorColor);
+          for (const mesh of meshes) {
+            mesh.material.color.lerp(finish, 0.48);
+            mesh.userData.color = mesh.material.color.getHex();
+          }
+        }
+        itemMeshes.push(...meshes);
+      }
     }
     if (walking) {
       for (const mesh of itemMeshes) {
@@ -722,6 +878,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
   const canvas = renderer.domElement;
   canvas.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || action) return;
+    stopGuide();
     if (isInteriorView(mode)) canvas.focus({ preventScroll: true });
     action = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY };
     canvas.setPointerCapture(event.pointerId);
@@ -785,9 +942,13 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
       return;
     }
     if (mode === "walk") {
-      if (event.code === "Escape") clearWalkInput();
+      if (event.code === "Escape") {
+        stopGuide();
+        clearWalkInput();
+      }
       if (!walkKeys.has(event.code)) return;
       event.preventDefault();
+      stopGuide();
       heldKeys.add(event.code);
       render();
       return;
@@ -805,6 +966,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
     cancelAnimationFrame(frame);
     frame = 0;
     clearWalkInput();
+    stopGuide();
     onWalkNotice?.("正在恢复 3D 画面…");
   });
   canvas.addEventListener("webglcontextrestored", () => {
@@ -816,8 +978,12 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
     onWalkNotice?.("");
     render();
   });
-  window.addEventListener("blur", clearWalkInput);
-  document.addEventListener("visibilitychange", clearWalkInput);
+  function interruptWalk() {
+    stopGuide();
+    clearWalkInput();
+  }
+  window.addEventListener("blur", interruptWalk);
+  document.addEventListener("visibilitychange", interruptWalk);
   const observer = new ResizeObserver(render);
   observer.observe(element);
 
@@ -853,13 +1019,17 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
 
   return {
     update,
+    captureOverview,
     capturePanorama,
+    startGuide,
+    stopGuide,
     async readyForWalk() {
       await Promise.all([furnitureReady, appearance?.ready]);
     },
     setMode(value) {
       if (mode === value) return;
       const wasInside = isInteriorView(mode);
+      stopGuide();
       clearWalkInput();
       action = null;
       mode = value;
@@ -876,13 +1046,16 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
       if (inside) canvas.focus({ preventScroll: true });
     },
     focusRoom(id) {
-      if (isInteriorView(mode)) { placeWalker(id || null); render(); return; }
+      if (isInteriorView(mode)) { stopGuide(); placeWalker(id || null); render(); return; }
       const room = model?.rooms.find((room) => room.id === id);
       if (model) focus(room ? { rooms: [room], walls: [] } : model);
     },
     setWalkInput(direction, active) {
       if (mode !== "walk") return;
-      if (active) touchDirections.add(direction);
+      if (active) {
+        stopGuide();
+        touchDirections.add(direction);
+      }
       else touchDirections.delete(direction);
       render();
     },
@@ -902,8 +1075,8 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
       disposed = true;
       observer.disconnect();
       cancelAnimationFrame(frame);
-      window.removeEventListener("blur", clearWalkInput);
-      document.removeEventListener("visibilitychange", clearWalkInput);
+      window.removeEventListener("blur", interruptWalk);
+      document.removeEventListener("visibilitychange", interruptWalk);
       disposeGroup(layout);
       disposeGroup(annotations);
       walkFurniture?.dispose();
@@ -912,6 +1085,7 @@ export function createLayoutViewer(element, { onItem, onMeasure, onWalkRoom, onW
       walkPost?.dispose();
       lighting.dispose();
       renderer.dispose();
+      if (overviewPreview) renderer.forceContextLoss();
       canvas.remove();
     },
   };

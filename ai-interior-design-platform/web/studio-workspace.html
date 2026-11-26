@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#fbfbf6" />
+    <title>3D 设计工作台 · 交换空间</title>
+    <link rel="stylesheet" href="./styles.css?v=studio-workspace" />
+    <link rel="stylesheet" href="./layout-review/workspace.css?v=cream-v7" />
+    <link rel="stylesheet" href="./studio-workspace.css?v=studio-version-save" />
+  </head>
+  <body class="studio-workspace-page">
+    <header class="studio-workspace-header">
+      <a class="studio-workspace-back" data-studio-back href="./"><span aria-hidden="true">←</span> 返回方案</a>
+      <div class="studio-workspace-identity">
+        <h1 data-studio-title>3D 设计工作台</h1>
+        <span class="studio-workspace-version" data-studio-version></span>
+      </div>
+    </header>
+    <p class="studio-workspace-status" data-studio-status role="status" aria-atomic="true">正在打开 3D 工作台…</p>
+    <main class="studio-workspace-stage" data-studio-stage aria-label="3D 设计工作区"></main>
+    <dialog class="studio-save-dialog" data-studio-save-dialog aria-labelledby="studio-save-title">
+      <form method="dialog">
+        <h2 id="studio-save-title">保存方案</h2>
+        <p class="studio-save-note" data-studio-save-note hidden></p>
+        <div class="studio-save-choices">
+          <button class="studio-save-choice" type="submit" value="overwrite" data-studio-save-overwrite>
+            <strong data-studio-save-overwrite-label>覆盖当前版本</strong>
+            <span>更新此版本的内容，保留它的版本编号和分享链接。</span>
+          </button>
+          <button class="studio-save-choice studio-save-choice-primary" type="submit" value="append" data-studio-save-append>
+            <strong>新建版本</strong>
+            <span>将本次改动保存为一个新版本。</span>
+          </button>
+        </div>
+        <div class="studio-save-actions">
+          <button class="layout-action" type="submit" value="cancel" autofocus>取消</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="./studio-workspace.js?v=studio-version-save"></script>
+  </body>
+</html>

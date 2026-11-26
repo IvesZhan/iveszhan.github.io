@@ -1,0 +1,2327 @@
+{
+  "schema": "layout-review/v1",
+  "name": "金地大成乐府 · 奶油风",
+  "source": {
+    "drawing": "./floor-plan.webp",
+    "referenceFile": "IMG_1382.PNG",
+    "nominalTypeAreaM2": 119,
+    "referenceDimensionsMm": [
+      12100,
+      13300
+    ],
+    "ceilingHeightM": 2.8,
+    "method": "人工按装修布置截图描图，主卫入口校对至主卧"
+  },
+  "rooms": [
+    {
+      "id": "living",
+      "name": "客厅",
+      "roomType": "living",
+      "polygon": [
+        [
+          7.153459,
+          -4.637288
+        ],
+        [
+          12.1,
+          -4.637288
+        ],
+        [
+          12.1,
+          -0.0
+        ],
+        [
+          7.153459,
+          -0.0
+        ]
+      ],
+      "editorMaterial": "tile800",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "dining",
+      "name": "餐厅",
+      "roomType": "dining",
+      "polygon": [
+        [
+          7.153459,
+          -8.743219999999999
+        ],
+        [
+          12.1,
+          -8.743219999999999
+        ],
+        [
+          12.1,
+          -4.637288
+        ],
+        [
+          7.153459,
+          -4.637288
+        ]
+      ],
+      "editorMaterial": "tile800",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "kitchen",
+      "name": "厨房",
+      "roomType": "kitchen",
+      "polygon": [
+        [
+          7.153459,
+          -10.997458
+        ],
+        [
+          10.349686,
+          -10.997458
+        ],
+        [
+          10.349686,
+          -8.743219999999999
+        ],
+        [
+          7.153459,
+          -8.743219999999999
+        ]
+      ],
+      "editorMaterial": "tile800",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "entry",
+      "name": "玄关",
+      "roomType": "hall",
+      "polygon": [
+        [
+          10.349686,
+          -10.997458
+        ],
+        [
+          12.1,
+          -10.997458
+        ],
+        [
+          12.1,
+          -8.743219999999999
+        ],
+        [
+          10.349686,
+          -8.743219999999999
+        ]
+      ],
+      "editorMaterial": "tile800",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "hall",
+      "name": "卧室过道",
+      "roomType": "hall",
+      "polygon": [
+        [
+          2.876604,
+          -7.4872879999999995
+        ],
+        [
+          4.6116980000000005,
+          -7.4872879999999995
+        ],
+        [
+          4.6116980000000005,
+          -5.9576270000000005
+        ],
+        [
+          7.153459,
+          -5.9576270000000005
+        ],
+        [
+          7.153459,
+          -4.637288
+        ],
+        [
+          2.876604,
+          -4.637288
+        ]
+      ],
+      "editorMaterial": "tile800",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "guest",
+      "name": "次卧一",
+      "roomType": "bedroom",
+      "polygon": [
+        [
+          0.0,
+          -9.789831
+        ],
+        [
+          2.876604,
+          -9.789831
+        ],
+        [
+          2.876604,
+          -6.408475
+        ],
+        [
+          0.0,
+          -6.408475
+        ]
+      ],
+      "editorMaterial": "wood",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "public-bath",
+      "name": "公卫",
+      "roomType": "bathroom",
+      "polygon": [
+        [
+          2.876604,
+          -9.789831
+        ],
+        [
+          4.6116980000000005,
+          -9.789831
+        ],
+        [
+          4.6116980000000005,
+          -7.4872879999999995
+        ],
+        [
+          2.876604,
+          -7.4872879999999995
+        ]
+      ],
+      "editorMaterial": "antislip",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "flex",
+      "name": "次卧二",
+      "roomType": "bedroom",
+      "polygon": [
+        [
+          4.6116980000000005,
+          -9.789831
+        ],
+        [
+          7.153459,
+          -9.789831
+        ],
+        [
+          7.153459,
+          -5.9576270000000005
+        ],
+        [
+          4.6116980000000005,
+          -5.9576270000000005
+        ]
+      ],
+      "editorMaterial": "wood",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "master-bath",
+      "name": "主卫",
+      "roomType": "bathroom",
+      "polygon": [
+        [
+          0.0,
+          -6.408475
+        ],
+        [
+          2.876604,
+          -6.408475
+        ],
+        [
+          2.876604,
+          -4.637288
+        ],
+        [
+          0.0,
+          -4.637288
+        ]
+      ],
+      "editorMaterial": "antislip",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "master",
+      "name": "主卧",
+      "roomType": "bedroom",
+      "polygon": [
+        [
+          0.228302,
+          -4.637288
+        ],
+        [
+          4.185535,
+          -4.637288
+        ],
+        [
+          4.185535,
+          -0.0
+        ],
+        [
+          0.228302,
+          -0.0
+        ]
+      ],
+      "editorMaterial": "wood",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "child",
+      "name": "儿童房",
+      "roomType": "bedroom",
+      "polygon": [
+        [
+          4.185535,
+          -4.637288
+        ],
+        [
+          7.153459,
+          -4.637288
+        ],
+        [
+          7.153459,
+          -0.0
+        ],
+        [
+          4.185535,
+          -0.0
+        ]
+      ],
+      "editorMaterial": "wood",
+      "excludeFromRoutes": false
+    },
+    {
+      "id": "lift-hall",
+      "name": "电梯厅",
+      "roomType": "hall",
+      "polygon": [
+        [
+          9.360377,
+          -13.3
+        ],
+        [
+          12.1,
+          -13.3
+        ],
+        [
+          12.1,
+          -10.997458
+        ],
+        [
+          9.360377,
+          -10.997458
+        ]
+      ],
+      "editorMaterial": "antislip",
+      "excludeFromRoutes": true
+    }
+  ],
+  "walls": [
+    {
+      "id": "wall_001",
+      "name": "外墙",
+      "start": [
+        0.0,
+        -4.637288
+      ],
+      "end": [
+        0.228302,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "master-bath"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_002",
+      "name": "室内分隔",
+      "start": [
+        0.228302,
+        -4.637288
+      ],
+      "end": [
+        2.876604,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "master",
+        "master-bath"
+      ]
+    },
+    {
+      "id": "wall_003",
+      "name": "室内分隔",
+      "start": [
+        2.876604,
+        -4.637288
+      ],
+      "end": [
+        4.185535,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "hall",
+        "master"
+      ]
+    },
+    {
+      "id": "wall_004",
+      "name": "室内分隔",
+      "start": [
+        4.185535,
+        -4.637288
+      ],
+      "end": [
+        7.153459,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "child",
+        "hall"
+      ]
+    },
+    {
+      "id": "wall_005",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -4.637288
+      ],
+      "end": [
+        12.1,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining",
+        "living"
+      ]
+    },
+    {
+      "id": "wall_006",
+      "name": "外墙",
+      "start": [
+        12.1,
+        -13.3
+      ],
+      "end": [
+        12.1,
+        -10.997458
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "lift-hall"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_007",
+      "name": "外墙",
+      "start": [
+        12.1,
+        -10.997458
+      ],
+      "end": [
+        12.1,
+        -8.743219999999999
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "entry"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_008",
+      "name": "外墙",
+      "start": [
+        12.1,
+        -8.743219999999999
+      ],
+      "end": [
+        12.1,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_009",
+      "name": "外墙",
+      "start": [
+        12.1,
+        -4.637288
+      ],
+      "end": [
+        12.1,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "living"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_010",
+      "name": "外墙",
+      "start": [
+        0.228302,
+        -0.0
+      ],
+      "end": [
+        4.185535,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "master"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_011",
+      "name": "外墙",
+      "start": [
+        4.185535,
+        -0.0
+      ],
+      "end": [
+        7.153459,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "child"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_012",
+      "name": "外墙",
+      "start": [
+        7.153459,
+        -0.0
+      ],
+      "end": [
+        12.1,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "living"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_013",
+      "name": "外墙",
+      "start": [
+        7.153459,
+        -10.997458
+      ],
+      "end": [
+        7.153459,
+        -9.789831
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "kitchen"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_014",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -9.789831
+      ],
+      "end": [
+        7.153459,
+        -8.743219999999999
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "flex",
+        "kitchen"
+      ]
+    },
+    {
+      "id": "wall_015",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -8.743219999999999
+      ],
+      "end": [
+        7.153459,
+        -5.9576270000000005
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining",
+        "flex"
+      ]
+    },
+    {
+      "id": "wall_016",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -5.9576270000000005
+      ],
+      "end": [
+        7.153459,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining",
+        "hall"
+      ]
+    },
+    {
+      "id": "wall_017",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -4.637288
+      ],
+      "end": [
+        7.153459,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "child",
+        "living"
+      ]
+    },
+    {
+      "id": "wall_018",
+      "name": "室内分隔",
+      "start": [
+        7.153459,
+        -8.743219999999999
+      ],
+      "end": [
+        10.349686,
+        -8.743219999999999
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining",
+        "kitchen"
+      ]
+    },
+    {
+      "id": "wall_019",
+      "name": "室内分隔",
+      "start": [
+        10.349686,
+        -8.743219999999999
+      ],
+      "end": [
+        12.1,
+        -8.743219999999999
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "dining",
+        "entry"
+      ]
+    },
+    {
+      "id": "wall_020",
+      "name": "外墙",
+      "start": [
+        7.153459,
+        -10.997458
+      ],
+      "end": [
+        9.360377,
+        -10.997458
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "kitchen"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_021",
+      "name": "室内分隔",
+      "start": [
+        9.360377,
+        -10.997458
+      ],
+      "end": [
+        10.349686,
+        -10.997458
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "kitchen",
+        "lift-hall"
+      ]
+    },
+    {
+      "id": "wall_022",
+      "name": "室内分隔",
+      "start": [
+        10.349686,
+        -10.997458
+      ],
+      "end": [
+        12.1,
+        -10.997458
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "entry",
+        "lift-hall"
+      ]
+    },
+    {
+      "id": "wall_023",
+      "name": "室内分隔",
+      "start": [
+        10.349686,
+        -10.997458
+      ],
+      "end": [
+        10.349686,
+        -8.743219999999999
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "entry",
+        "kitchen"
+      ]
+    },
+    {
+      "id": "wall_024",
+      "name": "室内分隔",
+      "start": [
+        2.876604,
+        -7.4872879999999995
+      ],
+      "end": [
+        4.6116980000000005,
+        -7.4872879999999995
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "hall",
+        "public-bath"
+      ]
+    },
+    {
+      "id": "wall_025",
+      "name": "室内分隔",
+      "start": [
+        4.6116980000000005,
+        -9.789831
+      ],
+      "end": [
+        4.6116980000000005,
+        -7.4872879999999995
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "flex",
+        "public-bath"
+      ]
+    },
+    {
+      "id": "wall_026",
+      "name": "室内分隔",
+      "start": [
+        4.6116980000000005,
+        -7.4872879999999995
+      ],
+      "end": [
+        4.6116980000000005,
+        -5.9576270000000005
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "flex",
+        "hall"
+      ]
+    },
+    {
+      "id": "wall_027",
+      "name": "室内分隔",
+      "start": [
+        4.6116980000000005,
+        -5.9576270000000005
+      ],
+      "end": [
+        7.153459,
+        -5.9576270000000005
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "flex",
+        "hall"
+      ]
+    },
+    {
+      "id": "wall_028",
+      "name": "室内分隔",
+      "start": [
+        2.876604,
+        -9.789831
+      ],
+      "end": [
+        2.876604,
+        -7.4872879999999995
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "guest",
+        "public-bath"
+      ]
+    },
+    {
+      "id": "wall_029",
+      "name": "室内分隔",
+      "start": [
+        2.876604,
+        -7.4872879999999995
+      ],
+      "end": [
+        2.876604,
+        -6.408475
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "guest",
+        "hall"
+      ]
+    },
+    {
+      "id": "wall_030",
+      "name": "室内分隔",
+      "start": [
+        2.876604,
+        -6.408475
+      ],
+      "end": [
+        2.876604,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "hall",
+        "master-bath"
+      ]
+    },
+    {
+      "id": "wall_031",
+      "name": "外墙",
+      "start": [
+        0.0,
+        -9.789831
+      ],
+      "end": [
+        2.876604,
+        -9.789831
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "guest"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_032",
+      "name": "外墙",
+      "start": [
+        2.876604,
+        -9.789831
+      ],
+      "end": [
+        4.6116980000000005,
+        -9.789831
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "public-bath"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_033",
+      "name": "外墙",
+      "start": [
+        4.6116980000000005,
+        -9.789831
+      ],
+      "end": [
+        7.153459,
+        -9.789831
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "flex"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_034",
+      "name": "室内分隔",
+      "start": [
+        0.0,
+        -6.408475
+      ],
+      "end": [
+        2.876604,
+        -6.408475
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "guest",
+        "master-bath"
+      ]
+    },
+    {
+      "id": "wall_035",
+      "name": "外墙",
+      "start": [
+        0.0,
+        -9.789831
+      ],
+      "end": [
+        0.0,
+        -6.408475
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "guest"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_036",
+      "name": "外墙",
+      "start": [
+        0.0,
+        -6.408475
+      ],
+      "end": [
+        0.0,
+        -4.637288
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "master-bath"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_037",
+      "name": "室内分隔",
+      "start": [
+        4.185535,
+        -4.637288
+      ],
+      "end": [
+        4.185535,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "child",
+        "master"
+      ]
+    },
+    {
+      "id": "wall_038",
+      "name": "外墙",
+      "start": [
+        0.228302,
+        -4.637288
+      ],
+      "end": [
+        0.228302,
+        -0.0
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "master"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_039",
+      "name": "外墙",
+      "start": [
+        9.360377,
+        -13.3
+      ],
+      "end": [
+        12.1,
+        -13.3
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "lift-hall"
+      ],
+      "editorKind": "e"
+    },
+    {
+      "id": "wall_040",
+      "name": "外墙",
+      "start": [
+        9.360377,
+        -13.3
+      ],
+      "end": [
+        9.360377,
+        -10.997458
+      ],
+      "thicknessM": 0.18,
+      "heightM": 2.8,
+      "roomIds": [
+        "lift-hall"
+      ],
+      "editorKind": "e"
+    }
+  ],
+  "openings": [
+    {
+      "id": "master-bath-door",
+      "name": "主卫门",
+      "kind": "door",
+      "wallId": "wall_002",
+      "segment": [
+        [
+          1.902516,
+          -4.637288
+        ],
+        [
+          2.663522,
+          -4.637288
+        ]
+      ],
+      "roomIds": [
+        "master-bath",
+        "master"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "end",
+      "swingSide": [
+        0,
+        -1
+      ]
+    },
+    {
+      "id": "master-door",
+      "name": "主卧门",
+      "kind": "door",
+      "wallId": "wall_003",
+      "segment": [
+        [
+          2.967925,
+          -4.637288
+        ],
+        [
+          3.896352,
+          -4.637288
+        ]
+      ],
+      "roomIds": [
+        "master",
+        "hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "end",
+      "swingSide": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "child-door",
+      "name": "儿童房门",
+      "kind": "door",
+      "wallId": "wall_004",
+      "segment": [
+        [
+          6.133711,
+          -4.637288
+        ],
+        [
+          6.986038,
+          -4.637288
+        ]
+      ],
+      "roomIds": [
+        "child",
+        "hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "end",
+      "swingSide": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "living-dining",
+      "name": "客餐厅开放边界",
+      "kind": "passage",
+      "wallId": "wall_005",
+      "segment": [
+        [
+          7.153459,
+          -4.637288
+        ],
+        [
+          12.1,
+          -4.637288
+        ]
+      ],
+      "roomIds": [
+        "living",
+        "dining"
+      ],
+      "heightM": 2.8,
+      "sillM": 0
+    },
+    {
+      "id": "living-east-window",
+      "name": "客厅窗",
+      "kind": "window",
+      "wallId": "wall_009",
+      "segment": [
+        [
+          12.1,
+          -4.250847
+        ],
+        [
+          12.1,
+          -3.268644
+        ]
+      ],
+      "roomIds": [
+        "living"
+      ],
+      "heightM": 1.75,
+      "sillM": 0.7
+    },
+    {
+      "id": "master-south-window",
+      "name": "主卧窗",
+      "kind": "window",
+      "wallId": "wall_010",
+      "segment": [
+        [
+          1.034969,
+          0
+        ],
+        [
+          3.62239,
+          0
+        ]
+      ],
+      "roomIds": [
+        "master"
+      ],
+      "heightM": 2.25,
+      "sillM": 0.35
+    },
+    {
+      "id": "child-south-window",
+      "name": "儿童房窗",
+      "kind": "window",
+      "wallId": "wall_011",
+      "segment": [
+        [
+          4.961761,
+          0
+        ],
+        [
+          6.879497,
+          0
+        ]
+      ],
+      "roomIds": [
+        "child"
+      ],
+      "heightM": 2.25,
+      "sillM": 0.35
+    },
+    {
+      "id": "living-south-window",
+      "name": "客厅窗",
+      "kind": "window",
+      "wallId": "wall_012",
+      "segment": [
+        [
+          7.412201,
+          0
+        ],
+        [
+          11.582516,
+          0
+        ]
+      ],
+      "roomIds": [
+        "living"
+      ],
+      "heightM": 2.25,
+      "sillM": 0.35
+    },
+    {
+      "id": "bedroom-corridor",
+      "name": "餐厅至卧室过道洞口",
+      "kind": "passage",
+      "wallId": "wall_016",
+      "segment": [
+        [
+          7.153459,
+          -5.957627
+        ],
+        [
+          7.153459,
+          -4.637288
+        ]
+      ],
+      "roomIds": [
+        "dining",
+        "hall"
+      ],
+      "heightM": 2.8,
+      "sillM": 0
+    },
+    {
+      "id": "kitchen-dining",
+      "name": "餐厅至厨房开口",
+      "kind": "door",
+      "wallId": "wall_018",
+      "segment": [
+        [
+          7.990566,
+          -8.74322
+        ],
+        [
+          10.121384,
+          -8.74322
+        ]
+      ],
+      "roomIds": [
+        "kitchen",
+        "dining"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "sliding"
+    },
+    {
+      "id": "dining-entry",
+      "name": "玄关至餐厅开放洞口",
+      "kind": "passage",
+      "wallId": "wall_019",
+      "segment": [
+        [
+          10.349686,
+          -8.74322
+        ],
+        [
+          12.1,
+          -8.74322
+        ]
+      ],
+      "roomIds": [
+        "dining",
+        "entry"
+      ],
+      "heightM": 2.8,
+      "sillM": 0
+    },
+    {
+      "id": "front-door",
+      "name": "入户门",
+      "kind": "door",
+      "wallId": "wall_022",
+      "segment": [
+        [
+          10.410566,
+          -10.997458
+        ],
+        [
+          11.567296,
+          -10.997458
+        ]
+      ],
+      "roomIds": [
+        "entry",
+        "lift-hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "end",
+      "swingSide": [
+        0,
+        -1
+      ]
+    },
+    {
+      "id": "kitchen-entry",
+      "name": "玄关至厨房开口",
+      "kind": "door",
+      "wallId": "wall_023",
+      "segment": [
+        [
+          10.349686,
+          -10.192373
+        ],
+        [
+          10.349686,
+          -8.904237
+        ]
+      ],
+      "roomIds": [
+        "kitchen",
+        "entry"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "sliding"
+    },
+    {
+      "id": "public-bath-door",
+      "name": "公卫门",
+      "kind": "door",
+      "wallId": "wall_024",
+      "segment": [
+        [
+          3.089686,
+          -7.487288
+        ],
+        [
+          3.805031,
+          -7.487288
+        ]
+      ],
+      "roomIds": [
+        "public-bath",
+        "hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "start",
+      "swingSide": [
+        0,
+        -1
+      ]
+    },
+    {
+      "id": "flex-door",
+      "name": "次卧二门",
+      "kind": "door",
+      "wallId": "wall_027",
+      "segment": [
+        [
+          4.733459,
+          -5.957627
+        ],
+        [
+          5.601006,
+          -5.957627
+        ]
+      ],
+      "roomIds": [
+        "flex",
+        "hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "start",
+      "swingSide": [
+        0,
+        -1
+      ]
+    },
+    {
+      "id": "guest-door",
+      "name": "次卧一门",
+      "kind": "door",
+      "wallId": "wall_029",
+      "segment": [
+        [
+          2.876604,
+          -7.390678
+        ],
+        [
+          2.876604,
+          -6.488983
+        ]
+      ],
+      "roomIds": [
+        "guest",
+        "hall"
+      ],
+      "heightM": 2.2,
+      "sillM": 0,
+      "frameThicknessM": 0.0275,
+      "doorType": "hinged",
+      "hinge": "end",
+      "swingSide": [
+        -1,
+        0
+      ]
+    },
+    {
+      "id": "guest-north-window",
+      "name": "次卧一窗",
+      "kind": "window",
+      "wallId": "wall_031",
+      "segment": [
+        [
+          0.578365,
+          -9.789831
+        ],
+        [
+          2.359119,
+          -9.789831
+        ]
+      ],
+      "roomIds": [
+        "guest"
+      ],
+      "heightM": 1.55,
+      "sillM": 0.9
+    },
+    {
+      "id": "flex-north-window",
+      "name": "次卧二窗",
+      "kind": "window",
+      "wallId": "wall_033",
+      "segment": [
+        [
+          4.88566,
+          -9.789831
+        ],
+        [
+          6.285912,
+          -9.789831
+        ]
+      ],
+      "roomIds": [
+        "flex"
+      ],
+      "heightM": 1.55,
+      "sillM": 0.9
+    },
+    {
+      "id": "bath-west-window",
+      "name": "主卫窗",
+      "kind": "window",
+      "wallId": "wall_036",
+      "segment": [
+        [
+          0,
+          -5.844915
+        ],
+        [
+          0,
+          -5.200847
+        ]
+      ],
+      "roomIds": [
+        "master-bath"
+      ],
+      "heightM": 1.35,
+      "sillM": 1.1
+    },
+    {
+      "id": "master-west-window",
+      "name": "主卧窗",
+      "kind": "window",
+      "wallId": "wall_038",
+      "segment": [
+        [
+          0.228302,
+          -4.122034
+        ],
+        [
+          0.228302,
+          -3.123729
+        ]
+      ],
+      "roomIds": [
+        "master"
+      ],
+      "heightM": 1.75,
+      "sillM": 0.7
+    }
+  ],
+  "items": [
+    {
+      "id": "master_double_bed",
+      "name": "主卧床",
+      "roomId": "master",
+      "center": [
+        1.674214,
+        -1.819491
+      ],
+      "widthM": 1.799999,
+      "depthM": 2.15,
+      "heightM": 0.953671,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "bed",
+      "editorColor": "#E7DCD0"
+    },
+    {
+      "id": "child_single_bed",
+      "name": "儿童房床",
+      "roomId": "child",
+      "center": [
+        5.327044,
+        -2.302542
+      ],
+      "widthM": 1.2,
+      "depthM": 2.1,
+      "heightM": 0.459045,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "bed",
+      "editorColor": "#DED8CD"
+    },
+    {
+      "id": "guest_double_bed",
+      "name": "次卧一床",
+      "roomId": "guest",
+      "center": [
+        1.21761,
+        -8.501695
+      ],
+      "widthM": 1.5,
+      "depthM": 2.100001,
+      "heightM": 0.794726,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "bed",
+      "editorColor": "#E8DED3"
+    },
+    {
+      "id": "flex_single_bed",
+      "name": "次卧二床",
+      "roomId": "flex",
+      "center": [
+        6.01195,
+        -8.26017
+      ],
+      "widthM": 1.2,
+      "depthM": 2.1,
+      "heightM": 0.459045,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "bed",
+      "editorColor": "#DED5C8"
+    },
+    {
+      "id": "master-bath_shower",
+      "name": "主卫淋浴隔断",
+      "roomId": "master-bath",
+      "center": [
+        0.532705,
+        -5.458475
+      ],
+      "widthM": 0.841343,
+      "depthM": 1.085672,
+      "heightM": 2.1,
+      "bottomM": 0,
+      "rotationRad": 0.0,
+      "editorType": "shower",
+      "editorColor": "#E5EAE6"
+    },
+    {
+      "id": "master-bath_toilet",
+      "name": "主卫座便器",
+      "roomId": "master-bath",
+      "center": [
+        1.506791,
+        -6.115739
+      ],
+      "widthM": 0.273666,
+      "depthM": 0.397471,
+      "heightM": 0.281,
+      "bottomM": 0.105,
+      "rotationRad": 0.0,
+      "editorType": "toilet",
+      "editorColor": "#FFFEFB"
+    },
+    {
+      "id": "public-bath_shower",
+      "name": "公卫淋浴隔断",
+      "roomId": "public-bath",
+      "center": [
+        3.424529,
+        -9.226271
+      ],
+      "widthM": 0.736204,
+      "depthM": 0.95,
+      "heightM": 1.837572,
+      "bottomM": 0,
+      "rotationRad": 0.0,
+      "editorType": "shower",
+      "editorColor": "#E5EAE6"
+    },
+    {
+      "id": "public-bath_toilet",
+      "name": "公卫座便器",
+      "roomId": "public-bath",
+      "center": [
+        4.318963,
+        -8.195761
+      ],
+      "widthM": 0.273667,
+      "depthM": 0.397471,
+      "heightM": 0.281,
+      "bottomM": 0.105,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "toilet",
+      "editorColor": "#FFFEFB"
+    },
+    {
+      "id": "kitchen_kitchen_sink",
+      "name": "厨房水槽及龙头",
+      "roomId": "kitchen",
+      "center": [
+        8.782012,
+        -10.594915
+      ],
+      "widthM": 0.646267,
+      "depthM": 0.397078,
+      "heightM": 0.48,
+      "bottomM": 0.72,
+      "rotationRad": 0.0,
+      "editorType": "ksink",
+      "editorColor": "#D8D8D3"
+    },
+    {
+      "id": "floating_tv_console",
+      "name": "悬空电视柜",
+      "roomId": "living",
+      "center": [
+        11.795597,
+        -2.141526
+      ],
+      "widthM": 2.916,
+      "depthM": 0.396,
+      "heightM": 0.274,
+      "bottomM": 0.235,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "tvstand",
+      "editorColor": "#B69571"
+    },
+    {
+      "id": "dining_sideboard",
+      "name": "餐边柜",
+      "roomId": "dining",
+      "center": [
+        7.488302,
+        -7.390678
+      ],
+      "widthM": 2.266,
+      "depthM": 0.466,
+      "heightM": 0.844,
+      "bottomM": 0.02,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "cabinet",
+      "editorColor": "#E8DCCB"
+    },
+    {
+      "id": "kitchen_north_counter",
+      "name": "厨房北侧橱柜",
+      "roomId": "kitchen",
+      "center": [
+        8.782013,
+        -10.594915
+      ],
+      "widthM": 2.736,
+      "depthM": 0.616,
+      "heightM": 0.864,
+      "bottomM": 0.02,
+      "rotationRad": 0.0,
+      "editorType": "counter",
+      "editorColor": "#EEE7DA"
+    },
+    {
+      "id": "kitchen_west_counter",
+      "name": "厨房西侧橱柜",
+      "roomId": "kitchen",
+      "center": [
+        7.503522,
+        -9.644915
+      ],
+      "widthM": 1.296,
+      "depthM": 0.616,
+      "heightM": 0.864,
+      "bottomM": 0.02,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "counter",
+      "editorColor": "#EEE7DA"
+    },
+    {
+      "id": "entry_storage",
+      "name": "玄关柜",
+      "roomId": "entry",
+      "center": [
+        11.826038,
+        -9.789831
+      ],
+      "widthM": 1.716,
+      "depthM": 0.436,
+      "heightM": 2.524,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "shoecab",
+      "editorColor": "#DFD1C0"
+    },
+    {
+      "id": "master_wardrobe",
+      "name": "主卧衣柜",
+      "roomId": "master",
+      "center": [
+        3.789811,
+        -2.205932
+      ],
+      "widthM": 2.116,
+      "depthM": 0.596,
+      "heightM": 2.474,
+      "bottomM": 0.02,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "wardrobe",
+      "editorColor": "#E9E0D4"
+    },
+    {
+      "id": "child_wardrobe",
+      "name": "儿童房衣柜",
+      "roomId": "child",
+      "center": [
+        5.098742,
+        -4.283051
+      ],
+      "widthM": 1.616,
+      "depthM": 0.596,
+      "heightM": 2.474,
+      "bottomM": 0.02,
+      "rotationRad": 0.0,
+      "editorType": "wardrobe",
+      "editorColor": "#E7DFD4"
+    },
+    {
+      "id": "guest_wardrobe",
+      "name": "次卧一衣柜",
+      "roomId": "guest",
+      "center": [
+        1.007572,
+        -6.762712
+      ],
+      "widthM": 1.776,
+      "depthM": 0.596,
+      "heightM": 2.474,
+      "bottomM": 0.02,
+      "rotationRad": 3.141592653589793,
+      "editorType": "wardrobe",
+      "editorColor": "#E9E0D4"
+    },
+    {
+      "id": "flex_wardrobe",
+      "name": "次卧二衣柜",
+      "roomId": "flex",
+      "center": [
+        6.392453,
+        -6.311864
+      ],
+      "widthM": 1.266,
+      "depthM": 0.596,
+      "heightM": 2.474,
+      "bottomM": 0.02,
+      "rotationRad": 3.141592653589793,
+      "editorType": "wardrobe",
+      "editorColor": "#E9E0D4"
+    },
+    {
+      "id": "master-bath_vanity",
+      "name": "主卫台盆柜",
+      "roomId": "master-bath",
+      "center": [
+        2.42,
+        -5.973729
+      ],
+      "widthM": 0.656,
+      "depthM": 0.496,
+      "heightM": 0.574,
+      "bottomM": 0.24,
+      "rotationRad": 0.0,
+      "editorType": "vanity",
+      "editorColor": "#D9C5AB"
+    },
+    {
+      "id": "public-bath_vanity",
+      "name": "公卫外置台盆柜",
+      "roomId": "hall",
+      "center": [
+        4.215975,
+        -6.714407
+      ],
+      "widthM": 0.656,
+      "depthM": 0.496,
+      "heightM": 0.574,
+      "bottomM": 0.24,
+      "rotationRad": 0.0,
+      "editorType": "vanity",
+      "editorColor": "#DDD0BE"
+    },
+    {
+      "id": "sofa",
+      "name": "客厅沙发",
+      "roomId": "living",
+      "center": [
+        7.731824,
+        -2.302543
+      ],
+      "widthM": 2.311955,
+      "depthM": 0.936593,
+      "heightM": 0.744473,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "sofa",
+      "editorColor": "#E9DFD0"
+    },
+    {
+      "id": "coffee_table",
+      "name": "客厅茶几",
+      "roomId": "living",
+      "center": [
+        9.451698,
+        -2.302543
+      ],
+      "widthM": 1,
+      "depthM": 0.62,
+      "heightM": 0.33,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "coffeetable",
+      "editorColor": "#D4B895"
+    },
+    {
+      "id": "living_plant",
+      "name": "客厅落地盆栽",
+      "roomId": "living",
+      "center": [
+        11.612956,
+        -0.692373
+      ],
+      "widthM": 0.499793,
+      "depthM": 0.55,
+      "heightM": 0.796214,
+      "bottomM": 0,
+      "rotationRad": 0.0,
+      "editorType": "plant",
+      "editorColor": "#8C9777"
+    },
+    {
+      "id": "dining_table",
+      "name": "餐桌",
+      "roomId": "dining",
+      "center": [
+        9.588679,
+        -6.965254
+      ],
+      "widthM": 1.6,
+      "depthM": 0.76,
+      "heightM": 0.75,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "shape": "rectangular",
+      "editorType": "table",
+      "editorColor": "#BB9C76"
+    },
+    {
+      "id": "dining_chair_1",
+      "name": "餐椅 1",
+      "roomId": "dining",
+      "center": [
+        8.955,
+        -7.515254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "dining_chair_2",
+      "name": "餐椅 2",
+      "roomId": "dining",
+      "center": [
+        8.955,
+        -6.965254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "dining_chair_3",
+      "name": "餐椅 3",
+      "roomId": "dining",
+      "center": [
+        8.955,
+        -6.415254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "dining_chair_4",
+      "name": "餐椅 4",
+      "roomId": "dining",
+      "center": [
+        10.222,
+        -7.515254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "dining_chair_5",
+      "name": "餐椅 5",
+      "roomId": "dining",
+      "center": [
+        10.222,
+        -6.965254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "dining_chair_6",
+      "name": "餐椅 6",
+      "roomId": "dining",
+      "center": [
+        10.222,
+        -6.415254
+      ],
+      "widthM": 0.45,
+      "depthM": 0.49,
+      "heightM": 0.83,
+      "bottomM": 0,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "chair",
+      "editorColor": "#D9CBB8"
+    },
+    {
+      "id": "master_bedside_table",
+      "name": "主卧床头几",
+      "roomId": "master",
+      "center": [
+        1.674214,
+        -2.912712
+      ],
+      "widthM": 0.38,
+      "depthM": 0.38,
+      "heightM": 0.49,
+      "bottomM": 0.01,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "nightstand",
+      "editorColor": "#DCC7AF"
+    },
+    {
+      "id": "child_bedside_table",
+      "name": "儿童房床头几",
+      "roomId": "child",
+      "center": [
+        5.327044,
+        -3.095763
+      ],
+      "widthM": 0.38,
+      "depthM": 0.38,
+      "heightM": 0.49,
+      "bottomM": 0.01,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "nightstand",
+      "editorColor": "#DCC7AF"
+    },
+    {
+      "id": "guest_bedside_table",
+      "name": "次卧一床头几",
+      "roomId": "guest",
+      "center": [
+        1.21761,
+        -9.444915
+      ],
+      "widthM": 0.38,
+      "depthM": 0.38,
+      "heightM": 0.49,
+      "bottomM": 0.01,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "nightstand",
+      "editorColor": "#DCC7AF"
+    },
+    {
+      "id": "flex_bedside_table",
+      "name": "次卧二床头几",
+      "roomId": "flex",
+      "center": [
+        6.01195,
+        -9.05339
+      ],
+      "widthM": 0.38,
+      "depthM": 0.38,
+      "heightM": 0.49,
+      "bottomM": 0.01,
+      "rotationRad": 1.5707963267948966,
+      "editorType": "nightstand",
+      "editorColor": "#DCC7AF"
+    },
+    {
+      "id": "kitchen_induction_cooktop",
+      "name": "电磁灶",
+      "roomId": "kitchen",
+      "center": [
+        7.503522,
+        -9.644915
+      ],
+      "widthM": 0.56,
+      "depthM": 0.49,
+      "heightM": 0.022,
+      "bottomM": 0.889,
+      "rotationRad": -1.5707963267948966,
+      "editorType": "stove",
+      "editorColor": "#B1AAA0"
+    },
+    {
+      "id": "living_rug",
+      "name": "客厅奶油色织毯",
+      "roomId": "living",
+      "center": [
+        9.57,
+        -2.21
+      ],
+      "widthM": 3.45,
+      "depthM": 3.49,
+      "heightM": 0.012,
+      "bottomM": 0,
+      "rotationRad": 0,
+      "editorType": "rug",
+      "editorColor": "#DCD0BD"
+    },
+    {
+      "id": "living_reading_chair",
+      "name": "客厅单椅",
+      "roomId": "living",
+      "center": [
+        10.88,
+        -1.21
+      ],
+      "widthM": 0.72,
+      "depthM": 0.78,
+      "heightM": 0.85,
+      "bottomM": 0,
+      "rotationRad": 2.1467549799530254,
+      "editorType": "armchair",
+      "editorColor": "#CCB79D"
+    }
+  ],
+  "entranceId": "front-door",
+  "viewpoints": [
+    {
+      "id": "entry",
+      "name": "玄关",
+      "roomId": "entry",
+      "positionM": [
+        10.86717,
+        1.55,
+        -9.387288
+      ],
+      "targetM": [
+        11.019371,
+        1.55,
+        -10.707627
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "厨房",
+      "roomId": "kitchen",
+      "positionM": [
+        9.771321,
+        1.55,
+        -9.210169
+      ],
+      "targetM": [
+        8.47761,
+        1.55,
+        -10.530508
+      ]
+    },
+    {
+      "id": "dining",
+      "name": "餐厅",
+      "roomId": "dining",
+      "positionM": [
+        10.669308000000001,
+        1.55,
+        -5.683898
+      ],
+      "targetM": [
+        9.619119000000001,
+        1.55,
+        -7.052542000000001
+      ],
+      "walkView": {
+        "positionM": [
+          11.13,
+          1.47,
+          -5.42
+        ],
+        "targetM": [
+          9.2,
+          1.14,
+          -7.52
+        ],
+        "verticalFovDeg": 54
+      }
+    },
+    {
+      "id": "living",
+      "name": "客厅",
+      "roomId": "living",
+      "positionM": [
+        10.273584999999999,
+        1.55,
+        -3.848305
+      ],
+      "targetM": [
+        9.010314000000001,
+        1.55,
+        -1.722881
+      ],
+      "walkView": {
+        "positionM": [
+          11.28,
+          1.48,
+          -4.07
+        ],
+        "targetM": [
+          8.77,
+          1.05,
+          -1.81
+        ],
+        "verticalFovDeg": 52
+      }
+    },
+    {
+      "id": "hall",
+      "name": "卧室过道",
+      "roomId": "hall",
+      "positionM": [
+        6.696854999999999,
+        1.55,
+        -5.313559000000001
+      ],
+      "targetM": [
+        3.3484279999999997,
+        1.55,
+        -5.313559000000001
+      ]
+    },
+    {
+      "id": "child",
+      "name": "儿童房",
+      "roomId": "child",
+      "positionM": [
+        6.422893,
+        1.55,
+        -1.014407
+      ],
+      "targetM": [
+        5.129182,
+        1.55,
+        -2.302542
+      ]
+    },
+    {
+      "id": "master",
+      "name": "主卧",
+      "roomId": "master",
+      "positionM": [
+        3.500629,
+        1.55,
+        -3.622881
+      ],
+      "targetM": [
+        1.5981130000000001,
+        1.55,
+        -1.80339
+      ]
+    },
+    {
+      "id": "master-bath",
+      "name": "主卫",
+      "roomId": "master-bath",
+      "positionM": [
+        2.328679,
+        1.47,
+        -5.104237
+      ],
+      "targetM": [
+        1.7503140000000001,
+        1.47,
+        -5.844915
+      ]
+    },
+    {
+      "id": "public-bath",
+      "name": "公卫",
+      "roomId": "public-bath",
+      "positionM": [
+        3.5158490000000002,
+        1.46,
+        -7.873729
+      ],
+      "targetM": [
+        3.820252,
+        1.46,
+        -8.533897999999999
+      ]
+    },
+    {
+      "id": "guest",
+      "name": "次卧一",
+      "roomId": "guest",
+      "positionM": [
+        2.4352199999999997,
+        1.55,
+        -7.5033900000000004
+      ],
+      "targetM": [
+        1.019748,
+        1.55,
+        -8.501695
+      ]
+    },
+    {
+      "id": "flex",
+      "name": "次卧二",
+      "roomId": "flex",
+      "positionM": [
+        5.0987420000000006,
+        1.55,
+        -6.972034
+      ],
+      "targetM": [
+        6.0576099999999995,
+        1.55,
+        -8.517797
+      ]
+    }
+  ],
+  "warnings": [
+    "结构按装修布置图描线，尺寸为方案估算。原始勘测图与布置图的尺寸标注不同，施工前需复测。",
+    "层高暂取 2.8 米。门窗高度、圆角近似及承重属性待现场核对。"
+  ]
+}

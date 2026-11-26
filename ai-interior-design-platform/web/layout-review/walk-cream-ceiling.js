@@ -63,7 +63,39 @@ function joinedRuns(runs) {
   return result;
 }
 
-export function createCreamCeilingGlow() {
+function miter(run, end, runs) {
+  const [x, z] = run.ends[end];
+  const ux = Math.cos(run.angle);
+  const uz = Math.sin(run.angle);
+  for (const other of runs) {
+    if (other === run) continue;
+    const [px, pz] = other.ends[1 - end];
+    if (Math.hypot(px - x, pz - z) > 0.19) continue;
+    const vx = Math.cos(other.angle);
+    const vz = Math.sin(other.angle);
+    const determinant = ux * vz - uz * vx;
+    if (determinant < 0.6 && determinant > -0.6) continue;
+    return (inset) => ((px - x + (uz - vz) * inset) * vz - (pz - z + (vx - ux) * inset) * vx) / determinant;
+  }
+  return null;
+}
+
+function trimEnds(geometry, span, left, right) {
+  const points = geometry.getAttribute("position");
+  for (let i = 0; i < points.count; i += 1) {
+    const x = points.getX(i);
+    const inset = points.getZ(i);
+    const fraction = THREE.MathUtils.clamp(x / span + 0.5, 0, 1);
+    const maxCut = span * 0.44;
+    points.setX(i, x + THREE.MathUtils.lerp(
+      THREE.MathUtils.clamp(left(inset), -maxCut, maxCut),
+      THREE.MathUtils.clamp(right(inset), -maxCut, maxCut), fraction,
+    ));
+  }
+  geometry.computeVertexNormals();
+}
+
+export function createCreamCeilingGlow({ refined = false } = {}) {
   const size = 64;
   const pixels = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y += 1) {
@@ -77,11 +109,15 @@ export function createCreamCeilingGlow() {
   }
   const texture = new THREE.DataTexture(pixels, size, size);
   texture.minFilter = texture.magFilter = THREE.LinearFilter;
+  if (refined) {
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+  }
   texture.needsUpdate = true;
   return texture;
 }
 
-export function addCreamCeiling(group, scene, ceiling, appearance, glow) {
+export function addCreamCeiling(group, scene, ceiling, appearance, glow, { refined = false } = {}) {
   if (ceiling < 2.49) return;
   const finish = new THREE.MeshStandardMaterial({ color: appearance.ceiling, roughness: 0.94 });
   const diffuser = new THREE.MeshStandardMaterial({
@@ -89,10 +125,15 @@ export function addCreamCeiling(group, scene, ceiling, appearance, glow) {
   });
   const bounced = new THREE.MeshBasicMaterial({ color: 0xffc79c, map: glow, transparent: true, opacity: 0.47, depthWrite: false });
   const runs = joinedRuns(clearRuns(scene, ceiling));
-  for (const { ends: [[ax, az], [bx, bz]], angle } of runs) {
-    const width = Math.hypot(bx - ax, bz - az) - 0.038;
+  for (const run of runs) {
+    const { ends: [[ax, az], [bx, bz]], angle } = run;
+    const width = Math.hypot(bx - ax, bz - az) - (refined ? 0 : 0.038);
+    const leftMiter = refined && miter(run, 0, runs);
+    const rightMiter = refined && miter(run, 1, runs);
+    const left = leftMiter || (() => 0.009);
+    const right = rightMiter || (() => -0.009);
     const root = new THREE.Group();
-    root.position.set((ax + bx) / 2, ceiling, (az + bz) / 2);
+    root.position.set((ax + bx) / 2, ceiling - (refined ? 0.0015 : 0), (az + bz) / 2);
     root.rotation.y = -angle;
     group.add(root);
     const profile = new THREE.Shape().moveTo(0, 0).lineTo(0.088, 0).lineTo(0.088, -0.082)
@@ -100,15 +141,29 @@ export function addCreamCeiling(group, scene, ceiling, appearance, glow) {
     const extrusion = new THREE.ExtrudeGeometry(profile, { depth: width, bevelEnabled: false });
     extrusion.translate(0, 0, -width / 2);
     extrusion.rotateY(-Math.PI / 2);
+    if (refined) trimEnds(extrusion, width, left, right);
     const trim = new THREE.Mesh(extrusion, finish);
-    trim.castShadow = trim.receiveShadow = true;
+    trim.castShadow = trim.receiveShadow = !refined;
+    trim.userData.excludeWalkOcclusion = refined;
     root.add(trim);
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(width - 0.02, 0.006, 0.022), diffuser);
-    strip.position.set(0, -0.078, 0.209);
+    const diffuserGeometry = new THREE.BoxGeometry(width - (refined ? 0 : 0.02), 0.006, 0.022);
+    diffuserGeometry.translate(0, -0.078, 0.209);
+    if (refined) trimEnds(diffuserGeometry, width, left, right);
+    const strip = new THREE.Mesh(diffuserGeometry, diffuser);
+    strip.userData.excludeWalkOcclusion = refined;
     root.add(strip);
-    const wash = new THREE.Mesh(new THREE.PlaneGeometry(width + 0.08, 0.58), bounced);
-    wash.rotation.x = Math.PI / 2;
-    wash.position.set(0, -0.003, 0.408);
+    const washGeometry = new THREE.PlaneGeometry(width + (refined ? 0 : 0.08), 0.58);
+    washGeometry.rotateX(Math.PI / 2);
+    washGeometry.translate(0, -0.003, 0.408);
+    if (refined) {
+      trimEnds(washGeometry, width, left, right);
+      // The glow stays continuous across miters and fades out before an open end.
+      const uv = washGeometry.getAttribute("uv");
+      for (let i = 0; i < uv.count; i += 1) {
+        uv.setX(i, THREE.MathUtils.lerp(leftMiter ? 0.08 : 0, rightMiter ? 0.92 : 1, uv.getX(i)));
+      }
+    }
+    const wash = new THREE.Mesh(washGeometry, bounced);
     root.add(wash);
   }
   if (!runs.length) {

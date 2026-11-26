@@ -2,7 +2,7 @@ import * as THREE from "./vendor/three.module.min.js";
 import { mergeGeometries } from "./vendor/addons/utils/BufferGeometryUtils.js";
 import { containsPoint, isDiningTable } from "./scene.js";
 import { addCreamBedroom } from "./walk-cream-bedroom.js";
-import { addCreamCeiling, createCreamCeilingGlow } from "./walk-cream-ceiling.js";
+import { addCreamCeiling, createCreamCeilingGlow } from "./walk-cream-ceiling.js?v=cream-v7-interior";
 import { makeCreamMillwork } from "./walk-cream-millwork.js?v=cream-v6-3";
 import { createCreamDetails } from "./walk-cream-details.js";
 
@@ -620,7 +620,7 @@ function weave() {
   return map;
 }
 
-export function createWalkFitout() {
+export function createWalkFitout({ refined = false } = {}) {
   const rugMap = weave();
   let ceilingGlow;
   let creamDetails;
@@ -630,8 +630,8 @@ export function createWalkFitout() {
       group.add(decor);
       if (appearance.cream) {
         creamDetails ??= createCreamDetails();
-        ceilingGlow ??= createCreamCeilingGlow();
-        addCreamCeiling(decor, scene, ceiling, appearance, ceilingGlow);
+        ceilingGlow ??= createCreamCeilingGlow({ refined });
+        addCreamCeiling(decor, scene, ceiling, appearance, ceilingGlow, { refined });
       }
       for (const window of windows) {
         if (appearance.cream && creamDetails.addWindow(decor, window, ceiling)) continue;

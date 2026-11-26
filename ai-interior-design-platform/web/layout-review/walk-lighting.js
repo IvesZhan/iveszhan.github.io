@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { containsPoint, getLayoutBounds } from "./scene.js";
 import { HDRLoader } from "./vendor/addons/loaders/HDRLoader.js";
-import { createWalkContacts } from "./walk-contact-light.js";
+import { createWalkContacts } from "./walk-contact-light.js?v=cream-v7-interior";
 
 export function exteriorWindows(scene) {
   const rooms = new Map(scene.rooms.map((room) => [room.id, room]));
@@ -97,7 +97,7 @@ function placeCabinetWash(light, room, item, upper) {
   light.intensity = upper ? 11.8 : 6.1;
 }
 
-export function createWalkLighting(renderer, world, invalidate, cream = false, { visualProfile } = {}) {
+export function createWalkLighting(renderer, world, invalidate, cream = false, { visualProfile, refined = false } = {}) {
   const v6 = cream && visualProfile === "cream-v6";
   const daylight = new THREE.DirectionalLight(v6 ? 0xffdaa9 : cream ? 0xffdfb1 : 0xfff2e2, v6 ? 3.1 : cream ? 2.82 : 3.3);
   const fill = new THREE.PointLight(cream ? 0xffe8d3 : 0xfff4e9, 5, 4.6, 2);
@@ -109,7 +109,7 @@ export function createWalkLighting(renderer, world, invalidate, cream = false, {
   const artWash = cream ? new THREE.SpotLight(0xffdbac, 0, 2.25, Math.PI / 5.8, 0.88, 2) : null;
   const upperWash = v6 ? new THREE.RectAreaLight(0xffb774, 0, 1, 0.057) : null;
   const nicheWash = v6 ? new THREE.RectAreaLight(0xffb87b, 0, 1, 0.035) : null;
-  const contacts = cream ? createWalkContacts() : null;
+  const contacts = cream ? createWalkContacts({ detailed: refined }) : null;
   const rig = new THREE.Group();
   daylight.castShadow = true;
   const coarsePointer = window.matchMedia("(pointer: coarse)").matches;

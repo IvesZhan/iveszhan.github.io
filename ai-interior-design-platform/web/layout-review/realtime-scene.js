@@ -1,4 +1,4 @@
-import { containsPoint, isDiningTable, LAYOUT_SCHEMA, loadLayoutScene } from "./scene.js";
+import { containsPoint, isDiningTable, LAYOUT_SCHEMA, loadLayoutScene } from "./scene.js?v=studio-version-save";
 import { createWalkNavigation } from "./walk-navigation.js";
 
 const MM_PER_M = 1000;

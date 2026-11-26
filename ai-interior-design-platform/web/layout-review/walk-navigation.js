@@ -200,6 +200,15 @@ export function createWalkNavigation(scene, options = {}) {
     return isPoint(point) && blocker(point) === null;
   }
 
+  function canTraverse(start, end) {
+    const delta = [end[0] - start[0], end[1] - start[1]];
+    const intervals = Math.max(1, Math.ceil(length(delta) / Math.min(radius / 2, 0.035)));
+    for (let index = 1; index <= intervals; index += 1) {
+      if (!canOccupy(offset(start, delta, index / intervals))) return false;
+    }
+    return true;
+  }
+
   function spawn(roomId = null, preferred = null) {
     const candidates = roomId ? rooms.filter(({ room }) => room.id === roomId) : rooms;
     if (isPoint(preferred) && (!roomId || candidates.some((bounds) => inRoom(preferred, bounds))) && canOccupy(preferred)) {
@@ -276,5 +285,5 @@ export function createWalkNavigation(scene, options = {}) {
     return true;
   }
 
-  return { spawn, move, canOccupy, roomAt, doorLeaf, setDoorOpen };
+  return { spawn, move, canOccupy, canTraverse, roomAt, doorLeaf, setDoorOpen };
 }

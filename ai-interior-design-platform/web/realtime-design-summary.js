@@ -1,9 +1,10 @@
-export function createRealtimeDesignSummary(design, layout, brief) {
+export function createRealtimeDesignSummary(design, layout, brief, revision) {
   if (design?.schema !== "realtime-design/v1") return null;
 
+  const revised = revision > 1;
   const groups = [
-    ["已落实", "applied", design.applied],
-    ["待确认", "review", design.needsReview],
+    [revised ? "首次布置已落实" : "已落实", "applied", design.applied],
+    [revised ? "首次布置待确认" : "待确认", "review", design.needsReview],
   ].map(([title, state, entries]) => ({
     title,
     state,
@@ -18,7 +19,7 @@ export function createRealtimeDesignSummary(design, layout, brief) {
 
   const summary = document.createElement("summary");
   const heading = document.createElement("span");
-  heading.textContent = "设计要求";
+  heading.textContent = revised ? "首次自动布置记录" : "设计要求";
   const statuses = document.createElement("span");
   statuses.className = "realtime-design-statuses";
   summary.append(heading, statuses);

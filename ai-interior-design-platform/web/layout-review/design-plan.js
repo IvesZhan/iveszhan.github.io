@@ -1,5 +1,5 @@
 import { parseDesignBrief } from "./design-brief.js";
-import { applyFurnitureRequirements, buildInitialLayout } from "./realtime-scene.js";
+import { applyFurnitureRequirements, buildInitialLayout } from "./realtime-scene.js?v=studio-version-save";
 
 export function planRealtimeDesign(source, brief) {
   const initial = buildInitialLayout(source);
