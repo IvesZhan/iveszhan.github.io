@@ -2304,13 +2304,106 @@ body.is-login-dialog-open {
   text-align: center;
 }
 
-.workbench-floor .upload-panel.has-floor-preview [data-floor-preview] :is(svg, .floor-preview-image) {
+.workbench-floor .upload-panel.has-floor-preview [data-floor-preview] svg {
   width: 100%;
   height: clamp(420px, 62vh, 760px);
   background: #fbfbf6;
 }
 
-.floor-preview-image { display: block; object-fit: contain; }
+.floor-source-gallery {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: #fbfbf6;
+}
+
+.floor-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 10px;
+}
+
+.floor-source-grid figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.floor-source-grid img {
+  width: 100%;
+  height: clamp(170px, 34vh, 360px);
+  object-fit: contain;
+}
+
+.floor-source-grid figure:only-child img {
+  height: clamp(240px, 58vh, 690px);
+}
+
+.floor-source-grid figcaption,
+.floor-source-pdf,
+.floor-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.floor-source-grid figcaption {
+  justify-content: space-between;
+  background: #f3f5ee;
+  border-top: 1px solid var(--line);
+}
+
+.floor-source-grid figcaption span,
+.floor-source-pdf-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.floor-source-pdf,
+.floor-source-actions {
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+}
+
+.floor-source-pdf-name,
+.floor-source-actions p { flex: 1 1 140px; }
+
+.floor-source-pdf label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.floor-source-pdf input {
+  width: 64px;
+  min-height: 34px;
+  padding: 3px 5px;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+}
+
+.floor-source-button {
+  flex: none;
+  min-height: 34px;
+  padding-inline: 8px;
+  font-size: 12px;
+}
+
+.floor-source-actions [hidden] { display: none; }
+
+.floor-source-status {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
 
 .workbench-floor .upload-zone {
   width: 100%;
@@ -2418,6 +2511,14 @@ body.is-login-dialog-open {
   gap: 4px;
   margin: 0;
   padding-left: 17px;
+}
+
+.file-validation .floor-validation-retry {
+  justify-self: start;
+  min-height: 36px;
+  margin-top: 2px;
+  padding-inline: 10px;
+  font-size: 13px;
 }
 
 .status-current-step {

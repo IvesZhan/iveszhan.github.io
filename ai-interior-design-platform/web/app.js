@@ -1,7 +1,7 @@
 import { APP_CONFIG } from "./config.js?v=studio-version-save";
 import { loadLayoutScene, toFloorPlan } from "./layout-review/scene.js?v=studio-version-save";
 import { createVrBackgroundMusic } from "./vr-background-music.js";
-import { makeRealtimeStudioUrl, readRealtimeShare, realtimeMusic, REALTIME_SESSION_KEY, requestRealtime } from "./realtime-projects.js?v=studio-version-save";
+import { makeRealtimeStudioUrl, readRealtimeShare, realtimeMusic, REALTIME_SESSION_KEY, requestRealtime } from "./realtime-projects.js?v=floor-image-sources";
 import { createRealtimeDesignSummary } from "./realtime-design-summary.js?v=studio-version-save";
 
 const vrPreviewSamples = 8;
@@ -113,6 +113,7 @@ const designIdeaInput = document.querySelector("[data-design-idea]");
 const generateButton = document.querySelector("[data-generate-plan]");
 const generationStatusPanel = document.querySelector("[data-generation-status]");
 const floorValidationPanel = document.querySelector("[data-floor-validation]");
+const floorSourceStatus = document.querySelector("[data-floor-source-status]");
 const floorPreviewPanel = document.querySelector("[data-floor-preview]");
 const effectBriefInput = document.querySelector("[data-effect-brief-upload]");
 const effectBriefLabel = document.querySelector("[data-effect-brief-label]");
@@ -411,6 +412,9 @@ const rasterFloorTypes = new Map([
   [".png", "image/png"], [".jpg", "image/jpeg"], [".jpeg", "image/jpeg"], [".webp", "image/webp"],
 ]);
 const maxRasterFloorBytes = 8 * 1024 * 1024;
+const maxRasterBatchBytes = 16 * 1024 * 1024;
+const maxFloorPdfBytes = 20 * 1024 * 1024;
+const maxRasterImages = 4;
 const requiredFloorLayerRules = [
   {
     key: "wall",
@@ -502,7 +506,9 @@ let floorValidationState = { status: "empty", title: "", messages: [] };
 let floorValidationRunId = 0;
 let selectedFloorFile = null;
 let rasterFloorRequest = null;
-let floorPreviewObjectUrl = null;
+let rasterIntakeBusy = false;
+const floorImages = [];
+const floorPdfs = [];
 let importedLayout = null;
 let importedLayoutDraft = null;
 let activeImportLayout = null;
@@ -1279,7 +1285,7 @@ function shouldUseEffectBriefAsDesignIdea(styleId) {
 }
 
 async function handleGeneratePlan() {
-  if (!importState.floor || !importState.style || isGeneratingPlan) {
+  if (!importState.floor || !importState.style || isGeneratingPlan || rasterIntakeBusy || rasterFloorRequest) {
     return;
   }
   const effectBriefParseErrors = getEffectBriefParseErrors();
@@ -2828,7 +2834,7 @@ function bindUploadDropZone(input) {
     zone.classList.remove("is-drag-over");
 
     const droppedFiles = event.dataTransfer?.files;
-    if (!droppedFiles || droppedFiles.length === 0) {
+    if (input.disabled || !droppedFiles || droppedFiles.length === 0) {
       return;
     }
 
@@ -3449,41 +3455,188 @@ async function importLidarFloor(file, runId) {
   updateGenerateState();
 }
 
-async function importRasterFloor(file, contentType, runId, input) {
-  if (runId !== floorValidationRunId) return;
-  if (!requireRealtimeLogin(() => importRasterFloor(file, contentType, runId, input))) {
-    setFloorValidation({ status: "invalid", title: "请登录后识别户型", messages: ["若关闭登录窗口，可登录后重新选择图片。"] });
+function stopRasterRecognition() {
+  floorValidationRunId += 1;
+  rasterFloorRequest?.abort();
+  rasterFloorRequest = null;
+}
+
+function setFloorSourceStatus(message = "") {
+  floorSourceStatus.textContent = message;
+  floorSourceStatus.hidden = !message;
+}
+
+function rasterBatchChanged() {
+  stopRasterRecognition();
+  clearImportedLayout();
+  importState.floor = false;
+  selectedFloorFile = floorImages[0]?.file || null;
+  setFloorValidation({ status: "empty", title: "", messages: [] });
+  setFloorSourceStatus();
+  renderRasterFloorPreview();
+  updateGenerateState();
+}
+
+function rasterImageFile(file) {
+  const contentType = rasterFloorTypes.get(getFileExtension(file.name));
+  if (!contentType || !file.size) throw new Error(`无法读取「${file.name}」，请选择有效图片。`);
+  if (file.size > maxRasterFloorBytes) throw new Error(`「${file.name}」超过单图 8 MiB 的限制。`);
+  return file.type === contentType ? file : new File([file], file.name, { type: contentType, lastModified: file.lastModified });
+}
+
+function validateRasterBatch(files) {
+  if (files.length > maxRasterImages) throw new Error("每次最多识别 4 张图，PDF 每页计为一张。");
+  if (files.reduce((size, file) => size + file.size, 0) > maxRasterBatchBytes) throw new Error("所有识别图的大小合计不能超过 16 MiB。");
+}
+
+function sameFloorFile(left, right) {
+  return left.name === right.name && left.size === right.size && left.lastModified === right.lastModified;
+}
+
+async function prepareRasterInput(message, prepare) {
+  if (rasterIntakeBusy) return;
+  if (rasterFloorRequest) {
+    stopRasterRecognition();
+    setFloorValidation({ status: "empty", title: "", messages: [] });
+  }
+  rasterIntakeBusy = true;
+  setFloorSourceStatus(message);
+  renderRasterFloorPreview();
+  updateGenerateState();
+  try {
+    await prepare();
+    rasterBatchChanged();
+  } catch (error) {
+    setFloorSourceStatus(error?.message || "暂时无法读取图纸，请重试。");
+  } finally {
+    rasterIntakeBusy = false;
+    renderRasterFloorPreview();
     updateGenerateState();
-    input.value = "";
+  }
+}
+
+async function addRasterFiles(files) {
+  const knownFiles = [...floorImages.filter(({ pdf }) => !pdf).map(({ file }) => file), ...floorPdfs.map(({ file }) => file)];
+  const additions = files.filter((file) => {
+    if (knownFiles.some((known) => sameFloorFile(known, file))) return false;
+    knownFiles.push(file);
+    return true;
+  });
+  if (!additions.length) {
+    setFloorSourceStatus("这些图纸已添加。");
+    return;
+  }
+  if (floorImages.length + additions.length > maxRasterImages) {
+    setFloorSourceStatus("每次最多识别 4 张图，PDF 每页计为一张。");
+    return;
+  }
+  await prepareRasterInput("正在准备图纸预览…", async () => {
+    const images = [];
+    const pdfs = [];
+    try {
+      for (const file of additions) {
+        if (getFileExtension(file.name) !== ".pdf") {
+          images.push({ file: rasterImageFile(file), label: file.name });
+          continue;
+        }
+        if (!file.size || file.size > maxFloorPdfBytes) throw new Error(`请选择有效且不超过 20 MiB 的 PDF，当前文件为「${file.name}」。`);
+        const { openFloorplanPdf } = await import("./floorplan-import/pdf.js");
+        const pdf = { file, document: await openFloorplanPdf(file) };
+        pdfs.push(pdf);
+        const image = rasterImageFile(await pdf.document.renderPage(1));
+        images.push({ file: image, label: `${file.name} · 第 1 页`, pdf, page: 1 });
+      }
+      validateRasterBatch([...floorImages, ...images].map(({ file }) => file));
+    } catch (error) {
+      pdfs.forEach(({ document }) => document.close());
+      throw error;
+    }
+    floorPdfs.push(...pdfs);
+    floorImages.push(...images.map((image) => ({ ...image, url: URL.createObjectURL(image.file) })));
+  });
+}
+
+async function addRasterPdfPage(pdf, page) {
+  if (!Number.isInteger(page) || page < 1 || page > pdf.document.pageCount) {
+    setFloorSourceStatus(`请输入 1 到 ${pdf.document.pageCount} 之间的页码。`);
+    return;
+  }
+  if (floorImages.some((image) => image.pdf === pdf && image.page === page)) {
+    setFloorSourceStatus(`第 ${page} 页已添加。`);
+    return;
+  }
+  if (floorImages.length >= maxRasterImages) {
+    setFloorSourceStatus("每次最多识别 4 张图，请先移除一张图再添加。");
+    return;
+  }
+  await prepareRasterInput(`正在读取第 ${page} 页…`, async () => {
+    const file = rasterImageFile(await pdf.document.renderPage(page));
+    validateRasterBatch([...floorImages.map((image) => image.file), file]);
+    floorImages.push({ file, label: `${pdf.file.name} · 第 ${page} 页`, pdf, page, url: URL.createObjectURL(file) });
+  });
+}
+
+function removeRasterImages(predicate) {
+  for (let index = floorImages.length - 1; index >= 0; index -= 1) {
+    if (!predicate(floorImages[index])) continue;
+    URL.revokeObjectURL(floorImages[index].url);
+    floorImages.splice(index, 1);
+  }
+}
+
+function clearRasterSources() {
+  removeRasterImages(() => true);
+  floorPdfs.splice(0).forEach(({ document }) => document.close());
+}
+
+async function importRasterFloor(runId = floorValidationRunId) {
+  if (runId !== floorValidationRunId || rasterFloorRequest || rasterIntakeBusy || isGeneratingPlan || !floorImages.length) return;
+  const retry = () => importRasterFloor(runId);
+  if (!requireRealtimeLogin(retry)) {
+    setFloorValidation({ status: "invalid", title: "请登录后识别户型", messages: ["登录后继续识别已选图纸。"], retry });
+    updateGenerateState();
     return;
   }
   const request = new AbortController();
   rasterFloorRequest = request;
-  setFloorValidation({ status: "checking", title: "正在识别图片户型", messages: ["正在读取墙体、房间、门窗和尺寸标注。"] });
+  const images = [...floorImages];
+  const body = new FormData();
+  for (const { file } of images) body.append("images", file);
+  setFloorSourceStatus();
+  setFloorValidation({ status: "checking", title: "正在识别图片户型", messages: [`正在从 ${images.length} 张图读取同一户型的墙体、房间、门窗和尺寸。`] });
+  updateGenerateState();
   try {
     const { layout, recognition } = await realtimeApi("/import/floor-plan/image", {
-      method: "POST", body: file, contentType, signal: request.signal,
+      method: "POST", body, signal: request.signal,
     });
     if (runId !== floorValidationRunId) return;
-    const name = file.name.replace(/\.[^.]+$/, "").trim();
-    const scene = loadLayoutScene({ ...layout, name: name || layout.name });
+    const verified = recognition?.source === "verified_template";
+    const original = images[0].pdf?.file || images[0].file;
+    const fileName = original.name.replace(/\.[^.]+$/, "").trim();
+    const name = verified ? layout?.name || fileName : fileName || layout?.name;
+    const scene = loadLayoutScene({ ...layout, name });
     if (!scene.rooms.some((room) => !room.excludeFromRoutes)) throw new Error("没有识别到可用于设计的封闭室内空间。");
+    clearImportedLayout();
     importedLayout = { scene, key: `image:${crypto.randomUUID()}` };
     importedLayoutDraft = scene;
     importLayoutButton.hidden = false;
     importState.floor = true;
     const dimensions = Array.isArray(recognition?.dimensions)
       ? recognition.dimensions.filter((dimension) => Number.isFinite(dimension?.millimeters)) : [];
-    setFloorValidation({ status: "valid", title: "图片户型已识别", messages: [
+    const dimensionText = dimensions.map(({ millimeters }) => formatMillimeters(millimeters)).join(" × ");
+    setFloorValidation({ status: "valid", title: verified ? "已匹配已校对户型" : "图片户型已识别", messages: [
+      ...(verified ? [scene.name] : []),
       `${scene.rooms.length} 个空间 · ${scene.walls.length} 段墙体 · ${scene.openings.length} 处门窗和通口`,
-      ...(dimensions.length === 2 ? [`按横纵标注 ${dimensions.map(({ millimeters }) => formatMillimeters(millimeters)).join(" × ")} 校准。`] : []),
+      ...(dimensions.length === 2 ? [verified ? `图纸标注 ${dimensionText}。` : `按横纵标注 ${dimensionText} 校准。`] : []),
       ...scene.warnings.slice(0, 4),
     ] });
   } catch (error) {
     if (runId !== floorValidationRunId) return;
-    input.value = "";
-    const message = error.name === "AbortError" ? "工作台账号已切换，请重新选择图片。" : formatRealtimeError(error);
-    setFloorValidation({ status: "invalid", title: "图片户型暂未识别", messages: [message] });
+    const accountChanged = error.name === "AbortError";
+    const canRetry = accountChanged || [401, 408, 429].includes(error.status) || error.status >= 500 || isRealtimeNetworkError(error);
+    const message = accountChanged ? "工作台账号已切换，可以重试已选图纸。" : formatRealtimeError(error);
+    const messages = importState.floor ? [message, "仍可使用上一次识别结果。"] : [message];
+    setFloorValidation({ status: "invalid", title: "图片户型暂未识别", messages, retry: canRetry ? retry : null });
   } finally {
     if (rasterFloorRequest === request) rasterFloorRequest = null;
     if (runId === floorValidationRunId) updateGenerateState();
@@ -3491,16 +3644,30 @@ async function importRasterFloor(file, contentType, runId, input) {
 }
 
 async function validateFloorFile(input, files = input.files) {
-  const file = files[0];
-  if (!file && selectedFloorFile) {
+  if (rasterIntakeBusy) return;
+  const selected = [...(files || [])];
+  const file = selected[0];
+  if (!file && (selectedFloorFile || floorPdfs.length)) {
     updateGenerateState();
     return;
   }
 
+  const isRasterSource = (entry) => {
+    const extension = getFileExtension(entry.name);
+    return rasterFloorTypes.has(extension) || extension === ".pdf";
+  };
+  if (selected.some(isRasterSource) || selected.length > 1) {
+    input.value = "";
+    if (APP_CONFIG.api?.realtimeBaseUrl && selected.every(isRasterSource)) await addRasterFiles(selected);
+    else setFloorSourceStatus("图片和 PDF 可一起添加。DXF、DWG 或户型 JSON 请单独选择一个文件。");
+    return;
+  }
+
   const extension = getFileExtension(file?.name ?? "");
-  const runId = ++floorValidationRunId;
-  rasterFloorRequest?.abort();
-  rasterFloorRequest = null;
+  stopRasterRecognition();
+  const runId = floorValidationRunId;
+  clearRasterSources();
+  setFloorSourceStatus();
   clearImportedLayout();
   clearFloorPreview();
 
@@ -3515,14 +3682,12 @@ async function validateFloorFile(input, files = input.files) {
     return;
   }
 
-  const rasterType = APP_CONFIG.api?.realtimeBaseUrl && rasterFloorTypes.get(extension);
-  if (!rasterType) setFloorPreviewMessage("正在读取图纸", ["上传后会解析 CAD 线段、房间边界和文字标注，并生成 2D 预览。"]);
+  setFloorPreviewMessage("正在读取图纸", ["上传后会解析 CAD 线段、房间边界和文字标注，并生成 2D 预览。"]);
   setFloorValidation({
     status: "checking",
     title: "正在检查户型文件",
     messages: [
-      rasterType ? "正在检查图片格式。"
-        : extension === ".dwg"
+      extension === ".dwg"
         ? "正在上传 DWG 到本地后端，转换为 DXF 后检查规范。"
         : "正在检查文件格式、DXF 结构和 CAD 图层规范。",
     ],
@@ -3531,6 +3696,7 @@ async function validateFloorFile(input, files = input.files) {
 
   const formatErrors = validateFloorFileFormat(file);
   if (formatErrors.length > 0) {
+    input.value = "";
     selectedFloorFile = null;
     setFloorValidation({
       status: "invalid",
@@ -3539,13 +3705,6 @@ async function validateFloorFile(input, files = input.files) {
     });
     clearFloorPreview();
     updateGenerateState();
-    return;
-  }
-
-  if (rasterType) {
-    selectedFloorFile = file;
-    renderRasterFloorPreview(file);
-    await importRasterFloor(file, rasterType, runId, input);
     return;
   }
 
@@ -3639,17 +3798,12 @@ function validateFloorFileFormat(file) {
     errors.push("文件为空，请重新导出有效的户型文件。");
   }
 
-  if (APP_CONFIG.api?.realtimeBaseUrl && rasterFloorTypes.has(extension)) {
-    if (file.size > maxRasterFloorBytes) errors.push("请上传不超过 8 MB 的户型图片。");
-    return errors;
-  }
-
   if (acceptedFloorExtensions.includes(extension)) {
     return errors;
   }
 
   errors.push(APP_CONFIG.api?.realtimeBaseUrl
-    ? "请选择 PNG、JPG、WebP 户型图，或导入 DXF、DWG 和户型 JSON。"
+    ? "请选择 PNG、JPG、WebP、PDF 户型图，或单独导入 DXF、DWG 和户型 JSON。"
     : "请上传 DXF、DWG 或 RoomPlan / OpenPlan3D 的户型 JSON。");
   return errors;
 }
@@ -3825,10 +3979,12 @@ function formatGenerationError(error) {
   return message || "方案生成失败，请检查图纸文件和本地后端服务。";
 }
 
+function isRealtimeNetworkError(error) {
+  return error instanceof TypeError && /fetch|load failed|networkerror/i.test(error.message);
+}
+
 function formatRealtimeError(error) {
-  if (error instanceof TypeError && /fetch|load failed|networkerror/i.test(error.message)) {
-    return "无法连接设计工作台服务，请检查网络后重试。";
-  }
+  if (isRealtimeNetworkError(error)) return "无法连接设计工作台服务，请检查网络后重试。";
   return error?.message || "暂时无法处理图纸，请稍后重试。";
 }
 
@@ -4474,45 +4630,150 @@ function renderFloorValidation() {
   title.textContent = floorValidationState.title;
   floorValidationPanel.append(title);
 
-  if (floorValidationState.messages.length === 0) {
-    return;
+  if (floorValidationState.messages.length > 0) {
+    const list = document.createElement("ul");
+    floorValidationState.messages.forEach((message) => {
+      const item = document.createElement("li");
+      item.textContent = message;
+      list.append(item);
+    });
+    floorValidationPanel.append(list);
   }
 
-  const list = document.createElement("ul");
-  floorValidationState.messages.forEach((message) => {
-    const item = document.createElement("li");
-    item.textContent = message;
-    list.append(item);
-  });
-
-  floorValidationPanel.append(list);
+  if (floorValidationState.retry) {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "ghost-action floor-validation-retry";
+    retry.textContent = "重试识别";
+    retry.addEventListener("click", floorValidationState.retry);
+    floorValidationPanel.append(retry);
+  }
   syncPostUploadRegionWidth();
 }
 
 function clearFloorPreview() {
-  if (floorPreviewObjectUrl) {
-    URL.revokeObjectURL(floorPreviewObjectUrl);
-    floorPreviewObjectUrl = null;
-  }
   if (!floorPreviewPanel) {
     return;
   }
   floorPreviewPanel.replaceChildren();
   const uploadPanel = floorPreviewPanel.closest(".upload-panel");
-  uploadPanel?.classList.remove("has-floor-preview");
+  uploadPanel?.classList.remove("has-floor-preview", "has-raster-sources");
   uploadPanel?.style.removeProperty("--post-upload-region-width");
 }
 
-function renderRasterFloorPreview(file) {
+function floorSourceButton(label, action) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ghost-action floor-source-button";
+  button.textContent = label;
+  button.disabled = rasterIntakeBusy;
+  if (action) button.addEventListener("click", action);
+  return button;
+}
+
+function renderRasterFloorPreview() {
   if (!floorPreviewPanel) return;
-  const image = document.createElement("img");
-  image.alt = `${file.name} 户型图预览`;
-  image.className = "floor-preview-image";
-  floorPreviewObjectUrl = URL.createObjectURL(file);
-  image.src = floorPreviewObjectUrl;
-  floorPreviewPanel.closest(".upload-panel")?.classList.add("has-floor-preview");
-  floorPreviewPanel.replaceChildren(image);
+  const uploadPanel = floorPreviewPanel.closest(".upload-panel");
+  const uploadLabel = uploadPanel?.querySelector('[data-import-step="floor"] + [data-upload-label]');
+  if (!floorImages.length && !floorPdfs.length) {
+    if (uploadPanel?.classList.contains("has-raster-sources")) {
+      clearFloorPreview();
+      if (uploadLabel) uploadLabel.textContent = uploadLabel.dataset.defaultLabel || "上传图纸";
+    }
+    return;
+  }
+
+  uploadPanel?.classList.add("has-floor-preview", "has-raster-sources");
+  if (uploadLabel) uploadLabel.textContent = "继续添加图纸";
+  const gallery = document.createElement("div");
+  gallery.className = "floor-source-gallery";
+  if (floorImages.length) {
+    const grid = document.createElement("div");
+    grid.className = "floor-source-grid";
+    for (const source of floorImages) {
+      const figure = document.createElement("figure");
+      const image = document.createElement("img");
+      image.alt = `${source.label}户型图预览`;
+      image.src = source.url;
+      const caption = document.createElement("figcaption");
+      const title = document.createElement("span");
+      title.textContent = source.label;
+      const remove = floorSourceButton("移除", () => {
+        removeRasterImages((image) => image === source);
+        rasterBatchChanged();
+      });
+      remove.setAttribute("aria-label", `移除 ${source.label}`);
+      caption.append(title, remove);
+      figure.append(image, caption);
+      grid.append(figure);
+    }
+    gallery.append(grid);
+  }
+
+  for (const pdf of floorPdfs) {
+    const controls = document.createElement("form");
+    controls.className = "floor-source-pdf";
+    const title = document.createElement("span");
+    title.className = "floor-source-pdf-name";
+    title.textContent = `${pdf.file.name} · 共 ${pdf.document.pageCount} 页`;
+    const pageLabel = document.createElement("label");
+    pageLabel.textContent = "页码";
+    const page = document.createElement("input");
+    page.type = "number";
+    page.min = "1";
+    page.max = String(pdf.document.pageCount);
+    page.required = true;
+    const selected = new Set(floorImages.filter((image) => image.pdf === pdf).map((image) => image.page));
+    let next = 1;
+    while (selected.has(next)) next += 1;
+    const allPagesSelected = next > pdf.document.pageCount;
+    page.value = String(allPagesSelected ? 1 : next);
+    page.disabled = rasterIntakeBusy || allPagesSelected;
+    page.setAttribute("aria-label", `${pdf.file.name} 的页码`);
+    pageLabel.append(page);
+    const add = floorSourceButton("添加页");
+    add.type = "submit";
+    add.disabled ||= allPagesSelected;
+    controls.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addRasterPdfPage(pdf, Number(page.value));
+    });
+    const remove = floorSourceButton("移除 PDF", () => {
+      removeRasterImages((image) => image.pdf === pdf);
+      floorPdfs.splice(floorPdfs.indexOf(pdf), 1);
+      pdf.document.close();
+      rasterBatchChanged();
+    });
+    remove.setAttribute("aria-label", `移除 ${pdf.file.name} 及已选页`);
+    controls.append(title, pageLabel, add, remove);
+    gallery.append(controls);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "floor-source-actions";
+  const summary = document.createElement("p");
+  const total = floorImages.reduce((size, { file }) => size + file.size, 0) / 1024 ** 2;
+  summary.textContent = `已选 ${floorImages.length} / 4 张 · ${total.toFixed(1)} / 16 MiB`;
+  const recognize = floorSourceButton("识别户型", () => importRasterFloor());
+  recognize.className = "primary-action";
+  recognize.setAttribute("data-recognize-floor-images", "");
+  actions.append(summary, recognize);
+  gallery.append(actions);
+  floorPreviewPanel.replaceChildren(gallery);
+  syncRasterSourceControls();
   syncPostUploadRegionWidth();
+}
+
+function syncRasterSourceControls() {
+  const input = importStepInputs.find(({ dataset }) => dataset.importStep === "floor");
+  if (input) input.disabled = rasterIntakeBusy;
+  const retry = floorValidationPanel?.querySelector(".floor-validation-retry");
+  if (retry) retry.disabled = rasterIntakeBusy || isGeneratingPlan;
+  const recognize = floorPreviewPanel?.querySelector("[data-recognize-floor-images]");
+  if (!recognize) return;
+  recognize.textContent = importState.floor || floorValidationState.status === "invalid" ? "重新识别户型" : "识别户型";
+  recognize.hidden = Boolean(floorValidationState.retry);
+  recognize.disabled = !floorImages.length || rasterIntakeBusy || Boolean(rasterFloorRequest) || isGeneratingPlan;
 }
 
 function setFloorPreviewMessage(title, messages = []) {
@@ -5169,6 +5430,7 @@ function normalizeDxfLayer(layer) {
 }
 
 function updateGenerateState() {
+  syncRasterSourceControls();
   const completedCount = importSteps.filter((step) => importState[step]).length;
   const isReady = completedCount === importSteps.length;
   const hasEffectBriefParseErrors = getEffectBriefParseErrors().length > 0;
@@ -5181,7 +5443,7 @@ function updateGenerateState() {
   });
 
   if (generateButton) {
-    const isDisabled = !isReady || isGeneratingPlan || hasEffectBriefParseErrors;
+    const isDisabled = !isReady || isGeneratingPlan || rasterIntakeBusy || Boolean(rasterFloorRequest) || hasEffectBriefParseErrors;
     generateButton.disabled = isDisabled;
     generateButton.setAttribute("aria-disabled", String(isDisabled));
   }

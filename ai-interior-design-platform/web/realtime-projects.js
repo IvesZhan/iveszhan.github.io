@@ -3,14 +3,15 @@ export const REALTIME_SESSION_KEY = "xspace-cloud-session";
 export async function requestRealtime(baseUrl, path, { method = "GET", body, shared = false, contentType, signal } = {}) {
   const headers = new Headers({ Accept: "application/json" });
   const binary = body instanceof Blob;
-  if (body !== undefined) headers.set("Content-Type", binary ? (contentType || body.type) : "application/json");
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers.set("Content-Type", binary ? (contentType || body.type) : "application/json");
   if (!shared) {
     const token = sessionStorage.getItem(REALTIME_SESSION_KEY);
     if (!token) throw Object.assign(new Error("请登录设计师工作台。"), { status: 401 });
     headers.set("Authorization", `Bearer ${token}`);
   }
   const response = await fetch(`${baseUrl}/api/v1${path}`, {
-    method, headers, body: binary ? body : JSON.stringify(body), signal,
+    method, headers, body: binary || multipart ? body : JSON.stringify(body), signal,
     referrerPolicy: "no-referrer", cache: "no-store",
   });
   const result = await response.json().catch(() => ({}));
