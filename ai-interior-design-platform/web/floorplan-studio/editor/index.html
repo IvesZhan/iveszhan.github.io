@@ -221,7 +221,7 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
   "three/addons/":"./vendor/three/addons/"
 }}
 </script>
-<link rel="stylesheet" href="./cream-editor.css">
+<link rel="stylesheet" href="./cream-editor.css?v=studio-save-feedback">
 </head>
 <body>
 <p class="editor-load-status" id="editorLoadStatus" role="status">正在载入大成乐府户型…</p>
@@ -283,7 +283,7 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
     <div class="grp only3d"><label class="range"><span data-en="Sun">日照</span> <input type="range" id="sun" min="7" max="18" step=".25" value="10" style="width:84px"><span id="sunT">10:00</span></label></div>
     <div class="spacer"></div>
     <button class="btn primary" id="platformSave" type="button" hidden disabled data-en="Save">保存</button>
-    <span class="platform-save-status" id="platformSaveStatus" role="status"></span>
+    <span class="platform-save-status" id="platformSaveStatus" role="status" aria-atomic="true"></span>
     <div class="grp" id="langSel" role="group" aria-label="Language / 语言">
       <button class="btn chip" data-lang="zh" title="简体中文">简</button>
       <button class="btn chip" data-lang="zht" title="繁體中文">繁</button>
@@ -348,6 +348,6 @@ main.drawer-panel #fab{opacity:0;visibility:hidden}
 </div>
 <div id="toast"></div>
 
-<script type="module" src="./bootstrap.js?v=studio-version-save"></script>
+<script type="module" src="./bootstrap.js?v=studio-save-feedback"></script>
 </body>
 </html>

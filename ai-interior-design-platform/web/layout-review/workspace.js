@@ -597,6 +597,10 @@ export function createLayoutWorkspace(holder, {
       const snapshot = loadLayoutScene(model);
       const message = await onSaveVersion(snapshot);
       if (!alive) return;
+      if (message === null) {
+        setVersionStatus("已取消保存，改动仍在草稿中。");
+        return;
+      }
       savedSignature = JSON.stringify(snapshot);
       dirty = JSON.stringify(model) !== savedSignature;
       setVersionStatus(typeof message === "string" && message ? message : "新版本已保存。");

@@ -11,7 +11,7 @@ export function mountFloorplanStudio(holder, {
   frame.className = "floorplan-studio-frame";
   frame.title = readOnly ? "整屋 3D 查看" : "户型 2D / 3D 设计工作台";
   frame.allow = "fullscreen";
-  frame.src = new URL("./editor/?embedded=1&v=studio-version-save", import.meta.url).href;
+  frame.src = new URL("./editor/?embedded=1&v=studio-save-feedback", import.meta.url).href;
   const actions = document.createElement("div");
   actions.className = "floorplan-studio-actions";
   const status = document.createElement("p");

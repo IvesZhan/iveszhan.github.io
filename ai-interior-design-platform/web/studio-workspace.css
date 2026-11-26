@@ -69,8 +69,8 @@
   overflow-wrap: anywhere;
 }
 
-.studio-workspace-version:empty,
-.studio-workspace-status:empty { display: none; }
+.studio-workspace-version:empty { display: none; }
+.studio-workspace-status:empty { position: absolute; padding: 0; border: 0; }
 
 .studio-workspace-status {
   padding: 8px var(--workspace-edge);
@@ -84,6 +84,12 @@
 .studio-workspace-status[data-state="error"] {
   color: #874934;
   background: #faf0e6;
+}
+
+.studio-workspace-status[data-state="success"] {
+  color: #315d4a;
+  background: #e5f2e8;
+  font-weight: 650;
 }
 
 .studio-workspace-stage {
@@ -192,6 +198,39 @@
 .studio-save-choice span { color: var(--ink-2); font-size: 13px; }
 .studio-save-choice-primary { background: #eaf3e9; border-color: #b8cfb9; }
 .studio-save-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+.studio-save-progress:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  color: #315d4a;
+  background: #eaf3e9;
+  border-radius: 6px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.studio-save-progress[data-state="error"] {
+  color: #874934;
+  background: #faf0e6;
+}
+
+.studio-save-progress[data-state="pending"]::before {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(49 93 74 / 25%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  content: "";
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .studio-save-progress[data-state="pending"]::before { animation: studio-save-spin 750ms linear infinite; }
+  @keyframes studio-save-spin { to { transform: rotate(1turn); } }
+}
 
 @media (max-width: 480px) {
   .studio-workspace-header { gap: 8px; }

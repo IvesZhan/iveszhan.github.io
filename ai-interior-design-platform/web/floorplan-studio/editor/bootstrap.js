@@ -67,8 +67,14 @@ function connectToPlatform() {
 
   function setSaveLock(locked) {
     window.floorplanEditorSaving = locked;
-    editor.setAttribute("aria-busy", String(locked));
+    saveButton.setAttribute("aria-busy", String(locked));
     for (const region of lockRegions) region.inert = locked;
+  }
+
+  function setSaveStatus(message = "", state) {
+    saveStatus.textContent = message;
+    if (state) saveStatus.dataset.state = state;
+    else delete saveStatus.dataset.state;
   }
 
   function canonicalState() {
@@ -88,13 +94,13 @@ function connectToPlatform() {
       const hasChanges = signature !== base;
       if (dirty !== hasChanges) post("dirty", { dirty: hasChanges });
       dirty = hasChanges;
-      saveStatus.textContent = "";
+      setSaveStatus();
       return updated;
     } catch (error) {
-      saveStatus.textContent = error.message;
+      setSaveStatus(error.message || "暂时无法准备保存，请重试。", "error");
       return null;
     } finally {
-      saveButton.disabled = !canSave || !dirty || Boolean(saveInProgress);
+      saveButton.disabled = !canSave || Boolean(saveInProgress);
     }
   }
 
@@ -111,10 +117,14 @@ function connectToPlatform() {
     if (!canSave || saveInProgress || !window.floorplanEditorReady) return;
     document.activeElement?.blur();
     const updated = sendChanges();
-    if (!updated || !dirty) return;
+    if (!updated) return;
+    if (!dirty) {
+      setSaveStatus("当前版本已保存，没有新的改动。", "success");
+      return;
+    }
     saveInProgress = latest;
     saveButton.disabled = true;
-    saveStatus.textContent = "正在保存…";
+    setSaveStatus("请选择保存方式。");
     setSaveLock(true);
     post("save", { scene: updated });
   }
@@ -152,7 +162,9 @@ function connectToPlatform() {
       saveInProgress = null;
       setSaveLock(false);
       sendChanges();
-      saveStatus.textContent = message.cancelled ? "" : message.message || (message.ok ? "版本已保存。" : "保存失败，请重试。");
+      if (message.cancelled) setSaveStatus("已取消保存，改动仍在草稿中。");
+      else if (message.ok) setSaveStatus(message.message || "版本已保存。", "success");
+      else setSaveStatus(message.message || "保存失败，请重试。", "error");
       if (!message.ok && !saveButton.disabled) saveButton.focus();
     }
   });

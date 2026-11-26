@@ -8,7 +8,7 @@
     <title>3D 设计工作台 · 交换空间</title>
     <link rel="stylesheet" href="./styles.css?v=studio-workspace" />
     <link rel="stylesheet" href="./layout-review/workspace.css?v=cream-v7" />
-    <link rel="stylesheet" href="./studio-workspace.css?v=studio-version-save" />
+    <link rel="stylesheet" href="./studio-workspace.css?v=studio-save-feedback" />
   </head>
   <body class="studio-workspace-page">
     <header class="studio-workspace-header">
@@ -34,11 +34,12 @@
             <span>将本次改动保存为一个新版本。</span>
           </button>
         </div>
+        <p class="studio-save-progress" data-studio-save-progress role="status" aria-atomic="true"></p>
         <div class="studio-save-actions">
-          <button class="layout-action" type="submit" value="cancel" autofocus>取消</button>
+          <button class="layout-action" type="submit" value="cancel" data-studio-save-cancel autofocus>取消</button>
         </div>
       </form>
     </dialog>
-    <script type="module" src="./studio-workspace.js?v=studio-version-save"></script>
+    <script type="module" src="./studio-workspace.js?v=studio-save-feedback"></script>
   </body>
 </html>

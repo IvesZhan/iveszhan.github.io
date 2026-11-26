@@ -58,10 +58,21 @@ body:not(.editor-ready) .app { visibility: hidden; }
 
 .platform-save-status {
   max-width: 260px;
-  color: var(--muted);
+  color: var(--ink);
+  font-weight: 550;
 }
 
-.platform-save-status:empty,
+.platform-save-status:empty { position: absolute; }
+
+.platform-save-status:not(:empty) {
+  padding: 4px 8px;
+  background: #f3efe7;
+  border-radius: 5px;
+}
+
+.platform-save-status[data-state="success"] { color: #315d4a; background: #e5f2e8; }
+.platform-save-status[data-state="error"] { color: #874934; background: #faf0e6; }
+
 .editor-embedded .studio-back,
 .editor-embedded #importJson,
 .editor-embedded #exportJson,
