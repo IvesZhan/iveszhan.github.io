@@ -1,5 +1,4 @@
 export const APP_CONFIG = {
-  publishedProjects: ["./assets/projects/jindi-dacheng-cream/manifest.json"],
   api: {
     // Enable only after the Container deployment and designer allowlist are ready.
     cloudAuth: false,
